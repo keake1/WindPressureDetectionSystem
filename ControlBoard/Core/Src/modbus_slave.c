@@ -23,9 +23,9 @@ typedef struct
   uint8_t broadcast;
 } ModbusRequest_t;
 
-static uint8_t g_coils[MODBUS_SLAVE_COIL_COUNT];
+/* 上行从机离散输入后备区，当前预留给后续开关量状态。 */
 static uint8_t g_discreteInputs[MODBUS_SLAVE_DISCRETE_COUNT];
-static uint16_t g_inputRegs[MODBUS_SLAVE_INPUT_REG_COUNT];
+/* 上行从机保持寄存器后备区，当前用于保存控制类或配置类数据。 */
 static uint16_t g_holdingRegs[MODBUS_SLAVE_HOLDING_REG_COUNT];
 
 static uint16_t Mb_ReadU16(const uint8_t *data)
@@ -167,6 +167,7 @@ static uint16_t Mb_ReadBits(const ModbusRequest_t *request,
   response[2] = byteCount;
   memset(&response[3], 0, byteCount);
 
+  /* Modbus 线圈响应按位打包，最低地址放在第一个数据字节的 bit0。 */
   for (i = 0U; i < request->quantity; ++i)
   {
     uint16_t address = (uint16_t)(request->start + i);
@@ -217,7 +218,7 @@ static uint8_t Mb_WriteSingleCoil(const ModbusRequest_t *request)
     return 0U;
   }
 
-  Mb_SetBit(g_coils, MODBUS_SLAVE_COIL_COUNT, request->start, (uint8_t)(value == 0xFF00U));
+  Mb_SetBit(g_modbusCoils, MODBUS_SLAVE_COIL_COUNT, request->start, (uint8_t)(value == 0xFF00U));
   return 1U;
 }
 
@@ -251,7 +252,7 @@ static uint8_t Mb_WriteMultipleCoils(const ModbusRequest_t *request, const uint8
   for (i = 0U; i < request->quantity; ++i)
   {
     uint8_t value = (frame[7U + (i / 8U)] >> (i % 8U)) & 0x01U;
-    Mb_SetBit(g_coils, MODBUS_SLAVE_COIL_COUNT, (uint16_t)(request->start + i), value);
+    Mb_SetBit(g_modbusCoils, MODBUS_SLAVE_COIL_COUNT, (uint16_t)(request->start + i), value);
   }
 
   return 1U;
@@ -320,13 +321,15 @@ static uint16_t Mb_BuildReadResponse(const ModbusRequest_t *request,
   switch (request->function)
   {
     case MB_FC_READ_COILS:
-      return Mb_ReadBits(request, g_coils, MODBUS_SLAVE_COIL_COUNT, response, responseMax);
+      /* 线圈区公开传感器在线/报警状态。 */
+      return Mb_ReadBits(request, g_modbusCoils, MODBUS_SLAVE_COIL_COUNT, response, responseMax);
     case MB_FC_READ_DISCRETE_INPUTS:
       return Mb_ReadBits(request, g_discreteInputs, MODBUS_SLAVE_DISCRETE_COUNT, response, responseMax);
     case MB_FC_READ_HOLDING_REGS:
       return Mb_ReadRegisters(request, g_holdingRegs, MODBUS_SLAVE_HOLDING_REG_COUNT, response, responseMax);
     case MB_FC_READ_INPUT_REGS:
-      return Mb_ReadRegisters(request, g_inputRegs, MODBUS_SLAVE_INPUT_REG_COUNT, response, responseMax);
+      /* 输入寄存器区公开传感器数据和型号。 */
+      return Mb_ReadRegisters(request, g_modbusInputRegs, MODBUS_SLAVE_INPUT_REG_COUNT, response, responseMax);
     default:
       return 0U;
   }
@@ -334,44 +337,12 @@ static uint16_t Mb_BuildReadResponse(const ModbusRequest_t *request,
 
 void ModbusSlave_InitData(void)
 {
-  memset(g_coils, 0, sizeof(g_coils));
+  /* 初始化上行从机数据区；全局状态区由传感器轮询任务持续刷新。 */
+  GlobalStatus_Init();
   memset(g_discreteInputs, 0, sizeof(g_discreteInputs));
-  memset(g_inputRegs, 0, sizeof(g_inputRegs));
   memset(g_holdingRegs, 0, sizeof(g_holdingRegs));
 
-  g_inputRegs[0] = 0x1234U;
-  g_inputRegs[1] = 0x5678U;
   g_holdingRegs[0] = 0x0001U;
-}
-
-void ModbusSlave_SetDiscreteInput(uint16_t address, uint8_t value)
-{
-  Mb_SetBit(g_discreteInputs, MODBUS_SLAVE_DISCRETE_COUNT, address, value);
-}
-
-void ModbusSlave_SetInputRegister(uint16_t address, uint16_t value)
-{
-  if (address >= MODBUS_SLAVE_INPUT_REG_COUNT)
-  {
-    return;
-  }
-
-  g_inputRegs[address] = value;
-}
-
-uint8_t ModbusSlave_GetCoil(uint16_t address)
-{
-  return Mb_GetBit(g_coils, MODBUS_SLAVE_COIL_COUNT, address);
-}
-
-uint16_t ModbusSlave_GetHoldingRegister(uint16_t address)
-{
-  if (address >= MODBUS_SLAVE_HOLDING_REG_COUNT)
-  {
-    return 0U;
-  }
-
-  return g_holdingRegs[address];
 }
 
 uint16_t ModbusSlave_HandleRequest(const uint8_t *request,
@@ -399,6 +370,7 @@ uint16_t ModbusSlave_HandleRequest(const uint8_t *request,
       return 0U;
     }
 
+    /* 广播写请求只执行不回复，符合 Modbus RTU 约定。 */
     if ((parsed.broadcast != 0U) || (response == NULL))
     {
       return 0U;

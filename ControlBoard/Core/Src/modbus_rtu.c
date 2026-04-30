@@ -6,19 +6,26 @@
 #include <string.h>
 
 #define MODBUS_RTU_FRAME_GAP_MS 5U
+#define MODBUS_RTU_PORT_COUNT   2U
 
-static UART_HandleTypeDef *g_uart;
-static SemaphoreHandle_t g_txMutex;
-static SemaphoreHandle_t g_txDoneSem;
-static uint8_t g_rxByte;
-static volatile uint8_t g_receiving;
-static volatile uint8_t g_overflow;
-static volatile uint8_t g_txActive;
-static volatile HAL_StatusTypeDef g_txStatus;
-static volatile uint16_t g_rxLen;
-static volatile uint32_t g_lastRxTick;
-static volatile uint32_t g_lastTxDoneTick;
-static uint8_t g_rxBuffer[MODBUS_RTU_MAX_FRAME_SIZE];
+typedef struct
+{
+  UART_HandleTypeDef *uart;
+  SemaphoreHandle_t txMutex;   /* 串行化同一 UART 上的发送操作。 */
+  SemaphoreHandle_t txDoneSem; /* 由发送完成/错误回调释放。 */
+  uint8_t rxByte;
+  volatile uint8_t receiving;
+  volatile uint8_t overflow;
+  volatile uint8_t txActive;
+  volatile HAL_StatusTypeDef txStatus;
+  volatile uint16_t rxLen;
+  volatile uint32_t lastRxTick;
+  volatile uint32_t lastTxDoneTick;
+  uint8_t rxBuffer[MODBUS_RTU_MAX_FRAME_SIZE];
+} ModbusRtu_Port_t;
+
+/* RTU 端口状态表：分别保存 USART1 和 USART2 的收发缓存、锁和中断状态。 */
+static ModbusRtu_Port_t g_ports[MODBUS_RTU_PORT_COUNT];
 
 static TickType_t ModbusRtu_MsToTicksCeil(uint32_t ms)
 {
@@ -26,166 +33,253 @@ static TickType_t ModbusRtu_MsToTicksCeil(uint32_t ms)
   return (ticks > 0U) ? ticks : 1U;
 }
 
-static void ModbusRtu_StartReceive(void)
+static ModbusRtu_Port_t *ModbusRtu_FindPort(UART_HandleTypeDef *uart)
 {
-  if (g_uart == NULL)
+  uint8_t i;
+
+  if (uart == NULL)
+  {
+    return NULL;
+  }
+
+  for (i = 0U; i < MODBUS_RTU_PORT_COUNT; ++i)
+  {
+    if ((g_ports[i].uart != NULL) && (g_ports[i].uart->Instance == uart->Instance))
+    {
+      return &g_ports[i];
+    }
+  }
+
+  return NULL;
+}
+
+static ModbusRtu_Port_t *ModbusRtu_AllocPort(UART_HandleTypeDef *uart)
+{
+  uint8_t i;
+  ModbusRtu_Port_t *port = ModbusRtu_FindPort(uart);
+
+  if (port != NULL)
+  {
+    return port;
+  }
+
+  for (i = 0U; i < MODBUS_RTU_PORT_COUNT; ++i)
+  {
+    if (g_ports[i].uart == NULL)
+    {
+      g_ports[i].uart = uart;
+      return &g_ports[i];
+    }
+  }
+
+  return NULL;
+}
+
+static void ModbusRtu_StartReceive(ModbusRtu_Port_t *port)
+{
+  if ((port == NULL) || (port->uart == NULL))
   {
     return;
   }
 
-  (void)HAL_UART_Receive_IT(g_uart, &g_rxByte, 1U);
+  (void)HAL_UART_Receive_IT(port->uart, &port->rxByte, 1U);
 }
 
-static void ModbusRtu_ResetRx(void)
+static void ModbusRtu_ResetRx(ModbusRtu_Port_t *port)
 {
-  g_receiving = 0U;
-  g_overflow = 0U;
-  g_rxLen = 0U;
+  port->receiving = 0U;
+  port->overflow = 0U;
+  port->rxLen = 0U;
 }
 
-static uint8_t ModbusRtu_FrameReady(void)
+static uint8_t ModbusRtu_FrameReady(ModbusRtu_Port_t *port)
 {
   uint32_t elapsed;
 
-  if (g_receiving == 0U)
+  if ((port == NULL) || (port->receiving == 0U))
   {
     return 0U;
   }
 
-  elapsed = HAL_GetTick() - g_lastRxTick;
+  /* RTU 没有长度字段，这里用 5 ms 静默间隔判断一帧已经结束。 */
+  elapsed = HAL_GetTick() - port->lastRxTick;
   return (elapsed >= MODBUS_RTU_FRAME_GAP_MS) ? 1U : 0U;
 }
 
-static void ModbusRtu_WaitTxFrameGap(void)
+static void ModbusRtu_WaitTxFrameGap(ModbusRtu_Port_t *port)
 {
-  while ((HAL_GetTick() - g_lastTxDoneTick) < MODBUS_RTU_FRAME_GAP_MS)
+  /* 发送新帧前也保留帧间隔，避免连续帧被对端合并解析。 */
+  while ((HAL_GetTick() - port->lastTxDoneTick) < MODBUS_RTU_FRAME_GAP_MS)
   {
     vTaskDelay(pdMS_TO_TICKS(1U));
   }
 }
 
-void ModbusRtu_Init(UART_HandleTypeDef *uart)
+uint8_t ModbusRtu_InitPort(UART_HandleTypeDef *uart)
 {
-  g_uart = uart;
-  g_txMutex = xSemaphoreCreateMutex();
-  g_txDoneSem = xSemaphoreCreateBinary();
-  g_txActive = 0U;
-  g_txStatus = HAL_OK;
-  g_lastTxDoneTick = HAL_GetTick() - MODBUS_RTU_FRAME_GAP_MS;
-  ModbusRtu_ResetRx();
-  ModbusRtu_StartReceive();
-}
+  ModbusRtu_Port_t *port = ModbusRtu_AllocPort(uart);
 
-uint8_t ModbusRtu_PollFrame(uint8_t *frame, uint16_t frameMax, uint16_t *frameLen)
-{
-  uint16_t copyLen;
-  uint8_t overflow;
-
-  if ((frame == NULL) || (frameLen == NULL) || (ModbusRtu_FrameReady() == 0U))
+  if (port == NULL)
   {
     return 0U;
   }
 
+  if (port->txMutex == NULL)
+  {
+    port->txMutex = xSemaphoreCreateMutex();
+  }
+
+  if (port->txDoneSem == NULL)
+  {
+    port->txDoneSem = xSemaphoreCreateBinary();
+  }
+
+  if ((port->txMutex == NULL) || (port->txDoneSem == NULL))
+  {
+    return 0U;
+  }
+
+  port->txActive = 0U;
+  port->txStatus = HAL_OK;
+  port->lastTxDoneTick = HAL_GetTick() - MODBUS_RTU_FRAME_GAP_MS;
+  ModbusRtu_ResetRx(port);
+  ModbusRtu_StartReceive(port);
+  return 1U;
+}
+
+void ModbusRtu_ClearPort(UART_HandleTypeDef *uart)
+{
+  ModbusRtu_Port_t *port = ModbusRtu_FindPort(uart);
+
+  if (port == NULL)
+  {
+    return;
+  }
+
   taskENTER_CRITICAL();
-  copyLen = g_rxLen;
-  overflow = g_overflow;
+  ModbusRtu_ResetRx(port);
+  taskEXIT_CRITICAL();
+}
+
+uint8_t ModbusRtu_PollFrameFrom(UART_HandleTypeDef *uart, uint8_t *frame, uint16_t frameMax, uint16_t *frameLen)
+{
+  uint16_t copyLen;
+  uint8_t overflow;
+  ModbusRtu_Port_t *port = ModbusRtu_FindPort(uart);
+
+  if ((port == NULL) || (frame == NULL) || (frameLen == NULL) || (ModbusRtu_FrameReady(port) == 0U))
+  {
+    return 0U;
+  }
+
+  /* 接收中断仍可能写缓存，复制和清空时需要进入临界区。 */
+  taskENTER_CRITICAL();
+  copyLen = port->rxLen;
+  overflow = port->overflow;
   if (copyLen > frameMax)
   {
     copyLen = frameMax;
   }
-  memcpy(frame, g_rxBuffer, copyLen);
-  ModbusRtu_ResetRx();
+  memcpy(frame, port->rxBuffer, copyLen);
+  ModbusRtu_ResetRx(port);
   taskEXIT_CRITICAL();
 
   *frameLen = copyLen;
   return (overflow == 0U) ? 1U : 0U;
 }
 
-HAL_StatusTypeDef ModbusRtu_Send(const uint8_t *frame, uint16_t frameLen, uint32_t timeoutMs)
+HAL_StatusTypeDef ModbusRtu_SendTo(UART_HandleTypeDef *uart, const uint8_t *frame, uint16_t frameLen, uint32_t timeoutMs)
 {
   HAL_StatusTypeDef status;
+  ModbusRtu_Port_t *port = ModbusRtu_FindPort(uart);
 
-  if ((g_uart == NULL) || (g_txMutex == NULL) || (g_txDoneSem == NULL) || (frame == NULL) || (frameLen == 0U))
+  if ((port == NULL) || (port->txMutex == NULL) || (port->txDoneSem == NULL) || (frame == NULL) || (frameLen == 0U))
   {
     return HAL_ERROR;
   }
 
-  (void)xSemaphoreTake(g_txMutex, portMAX_DELAY);
-  (void)xSemaphoreTake(g_txDoneSem, 0U);
+  (void)xSemaphoreTake(port->txMutex, portMAX_DELAY);
+  (void)xSemaphoreTake(port->txDoneSem, 0U);
 
-  ModbusRtu_WaitTxFrameGap();
+  ModbusRtu_WaitTxFrameGap(port);
 
-  g_txStatus = HAL_BUSY;
-  g_txActive = 1U;
-  status = HAL_UART_Transmit_IT(g_uart, (uint8_t *)frame, frameLen);
+  /* 使用中断发送降低任务阻塞时间，任务只等待完成信号或超时。 */
+  port->txStatus = HAL_BUSY;
+  port->txActive = 1U;
+  status = HAL_UART_Transmit_IT(port->uart, (uint8_t *)frame, frameLen);
   if (status != HAL_OK)
   {
-    g_txActive = 0U;
-    (void)xSemaphoreGive(g_txMutex);
+    port->txActive = 0U;
+    (void)xSemaphoreGive(port->txMutex);
     return status;
   }
 
-  if (xSemaphoreTake(g_txDoneSem, ModbusRtu_MsToTicksCeil(timeoutMs)) != pdTRUE)
+  if (xSemaphoreTake(port->txDoneSem, ModbusRtu_MsToTicksCeil(timeoutMs)) != pdTRUE)
   {
-    g_txActive = 0U;
-    (void)HAL_UART_AbortTransmit(g_uart);
-    (void)xSemaphoreGive(g_txMutex);
+    port->txActive = 0U;
+    /* 超时后终止尚未完成的硬件发送，防止下一帧接着未完成状态继续发送。 */
+    (void)HAL_UART_AbortTransmit(port->uart);
+    (void)xSemaphoreGive(port->txMutex);
     return HAL_TIMEOUT;
   }
 
-  status = g_txStatus;
-  (void)xSemaphoreGive(g_txMutex);
+  status = port->txStatus;
+  (void)xSemaphoreGive(port->txMutex);
   return status;
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
   BaseType_t higherPriorityTaskWoken = pdFALSE;
+  ModbusRtu_Port_t *port = ModbusRtu_FindPort(huart);
 
-  if ((g_uart != NULL) && (huart->Instance == g_uart->Instance) && (g_txActive != 0U))
+  if ((port != NULL) && (port->txActive != 0U) && (port->txDoneSem != NULL))
   {
-    g_lastTxDoneTick = HAL_GetTick();
-    g_txStatus = HAL_OK;
-    g_txActive = 0U;
-    (void)xSemaphoreGiveFromISR(g_txDoneSem, &higherPriorityTaskWoken);
+    port->lastTxDoneTick = HAL_GetTick();
+    port->txStatus = HAL_OK;
+    port->txActive = 0U;
+    (void)xSemaphoreGiveFromISR(port->txDoneSem, &higherPriorityTaskWoken);
     portYIELD_FROM_ISR(higherPriorityTaskWoken);
   }
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-  if ((g_uart != NULL) && (huart->Instance == g_uart->Instance))
+  ModbusRtu_Port_t *port = ModbusRtu_FindPort(huart);
+
+  if (port != NULL)
   {
-    if (g_rxLen < MODBUS_RTU_MAX_FRAME_SIZE)
+    if (port->rxLen < MODBUS_RTU_MAX_FRAME_SIZE)
     {
-      g_rxBuffer[g_rxLen] = g_rxByte;
-      g_rxLen++;
+      port->rxBuffer[port->rxLen] = port->rxByte;
+      port->rxLen++;
     }
     else
     {
-      g_overflow = 1U;
+      port->overflow = 1U;
     }
 
-    g_receiving = 1U;
-    g_lastRxTick = HAL_GetTick();
-    ModbusRtu_StartReceive();
+    port->receiving = 1U;
+    port->lastRxTick = HAL_GetTick();
+    ModbusRtu_StartReceive(port);
   }
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
   BaseType_t higherPriorityTaskWoken = pdFALSE;
+  ModbusRtu_Port_t *port = ModbusRtu_FindPort(huart);
 
-  if ((g_uart != NULL) && (huart->Instance == g_uart->Instance))
+  if (port != NULL)
   {
-    ModbusRtu_ResetRx();
-    ModbusRtu_StartReceive();
+    ModbusRtu_ResetRx(port);
+    ModbusRtu_StartReceive(port);
 
-    if (g_txActive != 0U)
+    if ((port->txActive != 0U) && (port->txDoneSem != NULL))
     {
-      g_txStatus = HAL_ERROR;
-      g_txActive = 0U;
-      (void)xSemaphoreGiveFromISR(g_txDoneSem, &higherPriorityTaskWoken);
+      port->txStatus = HAL_ERROR;
+      port->txActive = 0U;
+      (void)xSemaphoreGiveFromISR(port->txDoneSem, &higherPriorityTaskWoken);
       portYIELD_FROM_ISR(higherPriorityTaskWoken);
     }
   }
