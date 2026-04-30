@@ -1,6 +1,7 @@
 #include "modbus_rtu.h"
 
 #include "FreeRTOS.h"
+#include "dwin.h"
 #include "semphr.h"
 #include "task.h"
 #include <string.h>
@@ -241,6 +242,8 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
     (void)xSemaphoreGiveFromISR(port->txDoneSem, &higherPriorityTaskWoken);
     portYIELD_FROM_ISR(higherPriorityTaskWoken);
   }
+
+  UART3_SendTxCpltCallback(huart);
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
@@ -283,4 +286,6 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
       portYIELD_FROM_ISR(higherPriorityTaskWoken);
     }
   }
+
+  UART3_SendErrorCallback(huart);
 }

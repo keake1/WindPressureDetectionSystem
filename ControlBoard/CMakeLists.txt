@@ -48,6 +48,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/modbus_rtu.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/modbus_sensor_host.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/modbus_slave.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/dwin.c
     # FreeRTOS kernel sources
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/Middlewares/FreeRTOS/list.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/Middlewares/FreeRTOS/queue.c

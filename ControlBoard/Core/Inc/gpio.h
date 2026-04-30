@@ -39,6 +39,7 @@ extern "C" {
 void MX_GPIO_Init(void);
 
 /* USER CODE BEGIN Prototypes */
+uint8_t GPIO_ReadDeviceAddr(void);
 
 /* USER CODE END Prototypes */
 

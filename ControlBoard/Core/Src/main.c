@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "FreeRTOS.h"
+#include "dwin.h"
 #include "global_status.h"
 #include "modbus_rtu.h"
 #include "modbus_sensor_host.h"
@@ -52,6 +53,8 @@
 #define ALARM_CLEAR_PM25_THRESHOLD          25U
 #define ALARM_CLEAR_PM10_THRESHOLD          40U
 #define ALARM_CLEAR_CO_X100_THRESHOLD       2000U
+#define DWIN_ICON_UPDATE_INTERVAL_MS        100U
+#define DWIN_VALUE_UPDATE_INTERVAL_MS       500U
 
 /* USER CODE END PD */
 
@@ -72,6 +75,8 @@ void SystemClock_Config(void);
 static uint8_t ControllerAlarm_CalcSensorAlarm(const SensorInfo_t *sensor);
 static void ControllerAlarmTask(void *argument);
 static void ControllerStatusTask(void *argument);
+static void DwinIconTask(void *argument);
+static void DwinValueTask(void *argument);
 static void ModbusSensorOnlineTask(void *argument);
 static void ModbusSensorHostTask(void *argument);
 static void ModbusSlaveTask(void *argument);
@@ -82,6 +87,118 @@ static void ModbusSlaveTask(void *argument);
 /* USER CODE BEGIN 0 */
 
 
+
+static void DwinIconTask(void *argument)
+{
+  uint8_t lastControllerAlarm = 0U;
+  uint8_t lastDuplicateAddress = 0U;
+  uint8_t lastZeroAddress = 0U;
+  uint8_t lastSensorOnline[GLOBAL_STATUS_SENSOR_COUNT];
+  uint8_t lastSensorAlarm[GLOBAL_STATUS_SENSOR_COUNT];
+  uint8_t i;
+
+  (void)argument;
+
+  for (i = 0U; i < GLOBAL_STATUS_SENSOR_COUNT; ++i)
+  {
+    lastSensorOnline[i] = 0U;
+    lastSensorAlarm[i] = 0U;
+  }
+
+  for (;;)
+  {
+    if (g_controllerInfo.startupScanDone == 0U)
+    {
+      vTaskDelay(pdMS_TO_TICKS(100U));
+      continue;
+    }
+
+    if (g_controllerInfo.alarm != lastControllerAlarm)
+    {
+      uint8_t value = (g_controllerInfo.alarm != 0U) ? 1U : 0U;
+      DwinIcon_WriteValue(DWIN_GLOBAL_ALARM_ICON_ADDR, value);
+      DwinIcon_WriteValue(DWIN_WINDOWS_STATUS_ICON_ADDR, value);
+      lastControllerAlarm = g_controllerInfo.alarm;
+    }
+
+    if (g_controllerInfo.hasDuplicateAddressSensor != lastDuplicateAddress)
+    {
+      DwinIcon_WriteValue(DWIN_DUP_ADDR_ICON_ADDR,
+                          (g_controllerInfo.hasDuplicateAddressSensor != 0U) ? 1U : 0U);
+      lastDuplicateAddress = g_controllerInfo.hasDuplicateAddressSensor;
+    }
+
+    if (g_controllerInfo.hasZeroAddressSensor != lastZeroAddress)
+    {
+      DwinIcon_WriteValue(DWIN_ZERO_ADDR_ICON_ADDR,
+                          (g_controllerInfo.hasZeroAddressSensor != 0U) ? 1U : 0U);
+      lastZeroAddress = g_controllerInfo.hasZeroAddressSensor;
+    }
+
+    for (i = 0U; i < GLOBAL_STATUS_SENSOR_COUNT; ++i)
+    {
+      uint8_t online = *g_sensorInfos[i].online;
+      uint8_t alarm = *g_sensorInfos[i].alarm;
+
+      if ((online != lastSensorOnline[i]) || (alarm != lastSensorAlarm[i]))
+      {
+        uint16_t addr = (uint16_t)(DWIN_SENSOR_STATUS_ICON_ADDR + i);
+        DwinIcon_WriteValue(addr, DwinIcon_GetSensorStatusValue(online, alarm));
+        lastSensorOnline[i] = online;
+        lastSensorAlarm[i] = alarm;
+      }
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(DWIN_ICON_UPDATE_INTERVAL_MS));
+  }
+}
+
+static void DwinValueTask(void *argument)
+{
+  static uint16_t lastSensorData[GLOBAL_STATUS_SENSOR_COUNT][GLOBAL_STATUS_SENSOR_DATA_COUNT];
+  uint8_t lastSensorOnline[GLOBAL_STATUS_SENSOR_COUNT];
+  uint8_t lastControllerAddress = 0U;
+  uint8_t i;
+
+  (void)argument;
+
+  for (i = 0U; i < GLOBAL_STATUS_SENSOR_COUNT; ++i)
+  {
+    lastSensorOnline[i] = 0U;
+  }
+
+  for (;;)
+  {
+    uint8_t controllerAddress = GPIO_ReadDeviceAddr();
+    if (controllerAddress != lastControllerAddress)
+    {
+      g_controllerInfo.controllerAddress = controllerAddress;
+      DwinValue_WriteU16(DWIN_CONTROL_BORAD_ADDR_VAR, controllerAddress);
+      lastControllerAddress = controllerAddress;
+    }
+
+    if (g_controllerInfo.startupScanDone != 0U)
+    {
+      for (i = 0U; i < GLOBAL_STATUS_SENSOR_COUNT; ++i)
+      {
+        uint8_t online = *g_sensorInfos[i].online;
+
+        if (online != 0U)
+        {
+          uint8_t forceUpdate = (lastSensorOnline[i] == 0U) ? 1U : 0U;
+          DwinValue_UpdateSensor(i, lastSensorData[i], forceUpdate);
+          memcpy(lastSensorData[i],
+                 g_sensorInfos[i].data,
+                 sizeof(lastSensorData[i]));
+        }
+
+        lastSensorOnline[i] = online;
+      }
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(DWIN_VALUE_UPDATE_INTERVAL_MS));
+  }
+}
 
 static void ControllerAlarmTask(void *argument)
 {
@@ -244,6 +361,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_USART1_UART_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   /* USART2 是上行 Modbus 从机端口，USART1 是下行传感器 Modbus 主机端口。 */
   ModbusSlave_InitData();
@@ -255,11 +373,17 @@ int main(void)
   {
     Error_Handler();
   }
+  if (UART3_SendInit() == 0U)
+  {
+    Error_Handler();
+  }
   (void)xTaskCreate(ModbusSlaveTask, "mb_slave", 256U, NULL, tskIDLE_PRIORITY + 1U, NULL);
   (void)xTaskCreate(ModbusSensorHostTask, "mb_sensors", 384U, NULL, tskIDLE_PRIORITY + 1U, NULL);
   (void)xTaskCreate(ModbusSensorOnlineTask, "mb_online", 384U, NULL, tskIDLE_PRIORITY + 1U, NULL);
   (void)xTaskCreate(ControllerStatusTask, "ctrl_status", 256U, NULL, tskIDLE_PRIORITY + 1U, NULL);
   (void)xTaskCreate(ControllerAlarmTask, "ctrl_alarm", 256U, NULL, tskIDLE_PRIORITY + 1U, NULL);
+  (void)xTaskCreate(DwinIconTask, "dwin_icons", 384U, NULL, tskIDLE_PRIORITY + 1U, NULL);
+  (void)xTaskCreate(DwinValueTask, "dwin_values", 512U, NULL, tskIDLE_PRIORITY + 1U, NULL);
   vTaskStartScheduler();
 
   /* USER CODE END 2 */

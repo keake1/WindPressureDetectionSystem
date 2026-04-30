@@ -32,11 +32,11 @@ extern "C" {
 
 /* USER CODE END Includes */
 
-/* USART1 句柄：下行 RS485/Modbus 传感器总线。 */
 extern UART_HandleTypeDef huart1;
 
-/* USART2 句柄：上行 RS485/Modbus HostBoard 总线。 */
 extern UART_HandleTypeDef huart2;
+
+extern UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN Private defines */
 
@@ -44,6 +44,7 @@ extern UART_HandleTypeDef huart2;
 
 void MX_USART1_UART_Init(void);
 void MX_USART2_UART_Init(void);
+void MX_USART3_UART_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 

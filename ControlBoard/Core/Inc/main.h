@@ -57,6 +57,22 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define ADDR8_Pin GPIO_PIN_14
+#define ADDR8_GPIO_Port GPIOB
+#define ADDR7_Pin GPIO_PIN_15
+#define ADDR7_GPIO_Port GPIOB
+#define ADDR6_Pin GPIO_PIN_8
+#define ADDR6_GPIO_Port GPIOA
+#define ADDR5_Pin GPIO_PIN_15
+#define ADDR5_GPIO_Port GPIOA
+#define ADDR4_Pin GPIO_PIN_3
+#define ADDR4_GPIO_Port GPIOB
+#define ADDR3_Pin GPIO_PIN_4
+#define ADDR3_GPIO_Port GPIOB
+#define ADDR2_Pin GPIO_PIN_5
+#define ADDR2_GPIO_Port GPIOB
+#define ADDR1_Pin GPIO_PIN_6
+#define ADDR1_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
