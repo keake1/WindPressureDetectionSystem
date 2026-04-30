@@ -24,6 +24,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "FreeRTOS.h"
+#include "modbus_rtu.h"
+#include "modbus_slave.h"
 #include "task.h"
 
 /* USER CODE END Includes */
@@ -52,11 +54,36 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+static void ModbusSlaveTask(void *argument);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+static void ModbusSlaveTask(void *argument)
+{
+  uint8_t request[MODBUS_SLAVE_MAX_ADU_SIZE];
+  uint8_t response[MODBUS_SLAVE_MAX_ADU_SIZE];
+  uint16_t requestLen;
+  uint16_t responseLen;
+
+  (void)argument;
+
+  for (;;)
+  {
+    if (ModbusRtu_PollFrame(request, sizeof(request), &requestLen) != 0U)
+    {
+      responseLen = ModbusSlave_HandleRequest(request, requestLen, response, sizeof(response));
+      if (responseLen > 0U)
+      {
+        (void)ModbusRtu_Send(response, responseLen, 100U);
+      }
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(1U));
+  }
+}
 
 /* USER CODE END 0 */
 
@@ -91,6 +118,10 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  ModbusSlave_InitData();
+  ModbusRtu_Init(&huart2);
+  (void)xTaskCreate(ModbusSlaveTask, "mb_slave", 256U, NULL, tskIDLE_PRIORITY + 1U, NULL);
+  vTaskStartScheduler();
 
   /* USER CODE END 2 */
 

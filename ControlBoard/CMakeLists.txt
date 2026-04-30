@@ -44,6 +44,8 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/modbus_rtu.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/modbus_slave.c
     # FreeRTOS kernel sources
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/Middlewares/FreeRTOS/list.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/Middlewares/FreeRTOS/queue.c

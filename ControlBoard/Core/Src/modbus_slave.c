@@ -1,39 +1,83 @@
 #include "modbus_slave.h"
 
+#include <stddef.h>
 #include <string.h>
 
-#define MB_SLAVE_ADDR             1U
-#define MB_COIL_COUNT             64U
-#define MB_DISCRETE_COUNT         64U
-#define MB_INPUT_REG_COUNT        64U
-#define MB_HOLDING_REG_COUNT      64U
+#define MB_FC_READ_COILS              0x01U
+#define MB_FC_READ_DISCRETE_INPUTS    0x02U
+#define MB_FC_READ_HOLDING_REGS       0x03U
+#define MB_FC_READ_INPUT_REGS         0x04U
+#define MB_FC_WRITE_SINGLE_COIL       0x05U
+#define MB_FC_WRITE_SINGLE_REG        0x06U
+#define MB_FC_WRITE_MULTIPLE_COILS    0x0FU
+#define MB_FC_WRITE_MULTIPLE_REGS     0x10U
+#define MB_BROADCAST_ADDR             0U
+#define MB_MIN_FRAME_SIZE             8U
 
-static uint8_t g_mbCoils[MB_COIL_COUNT];
-static uint8_t g_mbDiscreteInputs[MB_DISCRETE_COUNT];
-static uint16_t g_mbInputRegs[MB_INPUT_REG_COUNT];
-static uint16_t g_mbHoldingRegs[MB_HOLDING_REG_COUNT];
-
-static uint8_t Modbus_GetBit(const uint8_t *array, uint16_t index, uint16_t maxCount)
+typedef struct
 {
-  if ((array == NULL) || (index >= maxCount))
+  uint8_t address;
+  uint8_t function;
+  uint16_t start;
+  uint16_t quantity;
+  uint8_t broadcast;
+} ModbusRequest_t;
+
+static uint8_t g_coils[MODBUS_SLAVE_COIL_COUNT];
+static uint8_t g_discreteInputs[MODBUS_SLAVE_DISCRETE_COUNT];
+static uint16_t g_inputRegs[MODBUS_SLAVE_INPUT_REG_COUNT];
+static uint16_t g_holdingRegs[MODBUS_SLAVE_HOLDING_REG_COUNT];
+
+static uint16_t Mb_ReadU16(const uint8_t *data)
+{
+  return ((uint16_t)data[0] << 8) | (uint16_t)data[1];
+}
+
+static void Mb_WriteU16(uint8_t *data, uint16_t value)
+{
+  data[0] = (uint8_t)(value >> 8);
+  data[1] = (uint8_t)value;
+}
+
+static uint8_t Mb_IsWriteFunction(uint8_t function)
+{
+  return ((function == MB_FC_WRITE_SINGLE_COIL) ||
+          (function == MB_FC_WRITE_SINGLE_REG) ||
+          (function == MB_FC_WRITE_MULTIPLE_COILS) ||
+          (function == MB_FC_WRITE_MULTIPLE_REGS)) ? 1U : 0U;
+}
+
+static uint8_t Mb_GetBit(const uint8_t *array, uint16_t count, uint16_t address)
+{
+  if ((array == NULL) || (address >= count))
   {
     return 0U;
   }
 
-  return array[index] ? 1U : 0U;
+  return array[address] ? 1U : 0U;
 }
 
-static void Modbus_SetBit(uint8_t *array, uint16_t index, uint16_t maxCount, uint8_t value)
+static void Mb_SetBit(uint8_t *array, uint16_t count, uint16_t address, uint8_t value)
 {
-  if ((array == NULL) || (index >= maxCount))
+  if ((array == NULL) || (address >= count))
   {
     return;
   }
 
-  array[index] = value ? 1U : 0U;
+  array[address] = value ? 1U : 0U;
 }
 
-static uint16_t Modbus_Crc16(const uint8_t *data, uint16_t length)
+static uint8_t Mb_RangeValid(uint16_t start, uint16_t quantity, uint16_t count)
+{
+  if (quantity == 0U)
+  {
+    return 0U;
+  }
+
+  return (start <= count) && (quantity <= (uint16_t)(count - start));
+}
+
+static uint16_t Mb_Crc16(const uint8_t *data, uint16_t length)
 {
   uint16_t crc = 0xFFFFU;
   uint16_t pos;
@@ -44,14 +88,11 @@ static uint16_t Modbus_Crc16(const uint8_t *data, uint16_t length)
     crc ^= (uint16_t)data[pos];
     for (bit = 0U; bit < 8U; ++bit)
     {
-      if ((crc & 0x0001U) != 0U)
+      uint16_t carry = crc & 0x0001U;
+      crc >>= 1U;
+      if (carry != 0U)
       {
-        crc >>= 1U;
         crc ^= 0xA001U;
-      }
-      else
-      {
-        crc >>= 1U;
       }
     }
   }
@@ -59,274 +100,322 @@ static uint16_t Modbus_Crc16(const uint8_t *data, uint16_t length)
   return crc;
 }
 
-void ModbusSlave_InitData(void)
+static uint8_t Mb_FrameValid(const uint8_t *frame, uint16_t length)
 {
-  memset(g_mbCoils, 0, sizeof(g_mbCoils));
-  memset(g_mbDiscreteInputs, 0, sizeof(g_mbDiscreteInputs));
-  memset(g_mbInputRegs, 0, sizeof(g_mbInputRegs));
-  memset(g_mbHoldingRegs, 0, sizeof(g_mbHoldingRegs));
-
-  g_mbInputRegs[0] = 0x1234U;
-  g_mbInputRegs[1] = 0x5678U;
-  g_mbHoldingRegs[0] = 0x0001U;
-}
-
-uint16_t ModbusSlave_HandleRequest(const uint8_t *request, uint16_t requestLen, uint8_t *response, uint16_t responseMax)
-{
-  uint8_t address;
-  uint8_t function;
   uint16_t crcRx;
   uint16_t crcCalc;
-  uint16_t start;
-  uint16_t quantity;
-  uint16_t value;
+
+  if ((frame == NULL) || (length < MB_MIN_FRAME_SIZE))
+  {
+    return 0U;
+  }
+
+  crcRx = (uint16_t)frame[length - 2U] | ((uint16_t)frame[length - 1U] << 8);
+  crcCalc = Mb_Crc16(frame, (uint16_t)(length - 2U));
+  return (crcRx == crcCalc) ? 1U : 0U;
+}
+
+static void Mb_ParseRequest(const uint8_t *request, ModbusRequest_t *parsed)
+{
+  parsed->address = request[0];
+  parsed->function = request[1];
+  parsed->start = Mb_ReadU16(&request[2]);
+  parsed->quantity = Mb_ReadU16(&request[4]);
+  parsed->broadcast = (request[0] == MB_BROADCAST_ADDR) ? 1U : 0U;
+}
+
+static uint8_t Mb_AddressMatches(const ModbusRequest_t *request)
+{
+  if (request->broadcast != 0U)
+  {
+    return Mb_IsWriteFunction(request->function);
+  }
+
+  return (request->address == MODBUS_SLAVE_ADDR) ? 1U : 0U;
+}
+
+static uint16_t Mb_FinishResponse(uint8_t *response, uint16_t payloadLen)
+{
+  uint16_t crc = Mb_Crc16(response, payloadLen);
+  response[payloadLen] = (uint8_t)crc;
+  response[payloadLen + 1U] = (uint8_t)(crc >> 8);
+  return (uint16_t)(payloadLen + 2U);
+}
+
+static uint16_t Mb_ReadBits(const ModbusRequest_t *request,
+                            const uint8_t *bits,
+                            uint16_t bitCount,
+                            uint8_t *response,
+                            uint16_t responseMax)
+{
+  uint8_t byteCount;
   uint16_t i;
-  uint8_t isBroadcast;
 
-  if ((request == NULL) || (response == NULL) || (requestLen < 8U))
+  if ((request->quantity > 2000U) || (Mb_RangeValid(request->start, request->quantity, bitCount) == 0U))
   {
     return 0U;
   }
 
-  address = request[0];
-  function = request[1];
-  isBroadcast = (address == 0U) ? 1U : 0U;
-
-  if ((address != MB_SLAVE_ADDR) && (isBroadcast == 0U))
+  byteCount = (uint8_t)((request->quantity + 7U) / 8U);
+  if (responseMax < (uint16_t)(byteCount + 5U))
   {
     return 0U;
   }
 
-  crcRx = (uint16_t)request[requestLen - 2U] | ((uint16_t)request[requestLen - 1U] << 8);
-  crcCalc = Modbus_Crc16(request, (uint16_t)(requestLen - 2U));
-  if (crcRx != crcCalc)
+  response[0] = MODBUS_SLAVE_ADDR;
+  response[1] = request->function;
+  response[2] = byteCount;
+  memset(&response[3], 0, byteCount);
+
+  for (i = 0U; i < request->quantity; ++i)
+  {
+    uint16_t address = (uint16_t)(request->start + i);
+    response[3U + (i / 8U)] |= (uint8_t)(Mb_GetBit(bits, bitCount, address) << (i % 8U));
+  }
+
+  return Mb_FinishResponse(response, (uint16_t)(byteCount + 3U));
+}
+
+static uint16_t Mb_ReadRegisters(const ModbusRequest_t *request,
+                                 const uint16_t *registers,
+                                 uint16_t registerCount,
+                                 uint8_t *response,
+                                 uint16_t responseMax)
+{
+  uint16_t i;
+  uint16_t byteCount;
+
+  if ((request->quantity > 125U) || (Mb_RangeValid(request->start, request->quantity, registerCount) == 0U))
   {
     return 0U;
   }
 
-  start = ((uint16_t)request[2] << 8) | (uint16_t)request[3];
-  quantity = ((uint16_t)request[4] << 8) | (uint16_t)request[5];
-
-  switch (function)
+  byteCount = (uint16_t)(request->quantity * 2U);
+  if (responseMax < (uint16_t)(byteCount + 5U))
   {
-    case 0x01U:
-    {
-      uint8_t byteCount;
-      uint16_t payloadLen;
+    return 0U;
+  }
 
-      if ((quantity == 0U) || (quantity > 2000U))
-      {
-        return 0U;  /* 异常不回复 */
-      }
-      if ((start + quantity) > MB_COIL_COUNT)
-      {
-        return 0U;  /* 异常不回复 */
-      }
+  response[0] = MODBUS_SLAVE_ADDR;
+  response[1] = request->function;
+  response[2] = (uint8_t)byteCount;
 
-      if (isBroadcast != 0U)
-      {
-        return 0U;
-      }
+  for (i = 0U; i < request->quantity; ++i)
+  {
+    Mb_WriteU16(&response[3U + (2U * i)], registers[request->start + i]);
+  }
 
-      byteCount = (uint8_t)((quantity + 7U) / 8U);
-      payloadLen = (uint16_t)(3U + byteCount);
-      if (responseMax < (payloadLen + 2U))
-      {
-        return 0U;
-      }
+  return Mb_FinishResponse(response, (uint16_t)(byteCount + 3U));
+}
 
-      response[0] = MB_SLAVE_ADDR;
-      response[1] = function;
-      response[2] = byteCount;
-      memset(&response[3], 0, byteCount);
-      for (i = 0U; i < quantity; ++i)
-      {
-        if (Modbus_GetBit(g_mbCoils, (uint16_t)(start + i), MB_COIL_COUNT) != 0U)
-        {
-          response[3U + (i / 8U)] |= (uint8_t)(1U << (i % 8U));
-        }
-      }
+static uint8_t Mb_WriteSingleCoil(const ModbusRequest_t *request)
+{
+  uint16_t value = request->quantity;
 
-      crcCalc = Modbus_Crc16(response, payloadLen);
-      response[payloadLen] = (uint8_t)(crcCalc & 0xFFU);
-      response[payloadLen + 1U] = (uint8_t)((crcCalc >> 8) & 0xFFU);
-      return (uint16_t)(payloadLen + 2U);
-    }
+  if ((request->start >= MODBUS_SLAVE_COIL_COUNT) || ((value != 0xFF00U) && (value != 0x0000U)))
+  {
+    return 0U;
+  }
 
-    case 0x02U:
-    {
-      uint8_t byteCount;
-      uint16_t payloadLen;
+  Mb_SetBit(g_coils, MODBUS_SLAVE_COIL_COUNT, request->start, (uint8_t)(value == 0xFF00U));
+  return 1U;
+}
 
-      if ((quantity == 0U) || (quantity > 2000U))
-      {
-        return 0U;  /* 异常不回复 */
-      }
-      if ((start + quantity) > MB_DISCRETE_COUNT)
-      {
-        return 0U;  /* 异常不回复 */
-      }
+static uint8_t Mb_WriteSingleRegister(const ModbusRequest_t *request)
+{
+  if (request->start >= MODBUS_SLAVE_HOLDING_REG_COUNT)
+  {
+    return 0U;
+  }
 
-      if (isBroadcast != 0U)
-      {
-        return 0U;
-      }
+  g_holdingRegs[request->start] = request->quantity;
+  return 1U;
+}
 
-      byteCount = (uint8_t)((quantity + 7U) / 8U);
-      payloadLen = (uint16_t)(3U + byteCount);
-      if (responseMax < (payloadLen + 2U))
-      {
-        return 0U;
-      }
+static uint8_t Mb_WriteMultipleCoils(const ModbusRequest_t *request, const uint8_t *frame, uint16_t frameLen)
+{
+  uint8_t byteCount = frame[6];
+  uint8_t expectedBytes = (uint8_t)((request->quantity + 7U) / 8U);
+  uint16_t i;
 
-      response[0] = MB_SLAVE_ADDR;
-      response[1] = function;
-      response[2] = byteCount;
-      memset(&response[3], 0, byteCount);
-      for (i = 0U; i < quantity; ++i)
-      {
-        if (Modbus_GetBit(g_mbDiscreteInputs, (uint16_t)(start + i), MB_DISCRETE_COUNT) != 0U)
-        {
-          response[3U + (i / 8U)] |= (uint8_t)(1U << (i % 8U));
-        }
-      }
+  if ((frameLen != (uint16_t)(byteCount + 9U)) || (byteCount != expectedBytes))
+  {
+    return 0U;
+  }
 
-      crcCalc = Modbus_Crc16(response, payloadLen);
-      response[payloadLen] = (uint8_t)(crcCalc & 0xFFU);
-      response[payloadLen + 1U] = (uint8_t)((crcCalc >> 8) & 0xFFU);
-      return (uint16_t)(payloadLen + 2U);
-    }
+  if ((request->quantity > 1968U) || (Mb_RangeValid(request->start, request->quantity, MODBUS_SLAVE_COIL_COUNT) == 0U))
+  {
+    return 0U;
+  }
 
-    case 0x03U:
-    {
-      uint16_t payloadLen;
+  for (i = 0U; i < request->quantity; ++i)
+  {
+    uint8_t value = (frame[7U + (i / 8U)] >> (i % 8U)) & 0x01U;
+    Mb_SetBit(g_coils, MODBUS_SLAVE_COIL_COUNT, (uint16_t)(request->start + i), value);
+  }
 
-      if ((quantity == 0U) || (quantity > 125U))
-      {
-        return 0U;  /* 异常不回复 */
-      }
-      if ((start + quantity) > MB_HOLDING_REG_COUNT)
-      {
-        return 0U;  /* 异常不回复 */
-      }
+  return 1U;
+}
 
-      if (isBroadcast != 0U)
-      {
-        return 0U;
-      }
+static uint8_t Mb_WriteMultipleRegisters(const ModbusRequest_t *request, const uint8_t *frame, uint16_t frameLen)
+{
+  uint8_t byteCount = frame[6];
+  uint16_t i;
 
-      payloadLen = (uint16_t)(3U + (2U * quantity));
-      if (responseMax < (payloadLen + 2U))
-      {
-        return 0U;
-      }
+  if ((frameLen != (uint16_t)(byteCount + 9U)) || (byteCount != (uint8_t)(request->quantity * 2U)))
+  {
+    return 0U;
+  }
 
-      response[0] = MB_SLAVE_ADDR;
-      response[1] = function;
-      response[2] = (uint8_t)(2U * quantity);
-      for (i = 0U; i < quantity; ++i)
-      {
-        uint16_t reg = g_mbHoldingRegs[start + i];
-        response[3U + (2U * i)] = (uint8_t)((reg >> 8) & 0xFFU);
-        response[4U + (2U * i)] = (uint8_t)(reg & 0xFFU);
-      }
+  if ((request->quantity > 123U) || (Mb_RangeValid(request->start, request->quantity, MODBUS_SLAVE_HOLDING_REG_COUNT) == 0U))
+  {
+    return 0U;
+  }
 
-      crcCalc = Modbus_Crc16(response, payloadLen);
-      response[payloadLen] = (uint8_t)(crcCalc & 0xFFU);
-      response[payloadLen + 1U] = (uint8_t)((crcCalc >> 8) & 0xFFU);
-      return (uint16_t)(payloadLen + 2U);
-    }
+  for (i = 0U; i < request->quantity; ++i)
+  {
+    g_holdingRegs[request->start + i] = Mb_ReadU16(&frame[7U + (2U * i)]);
+  }
 
-    case 0x04U:
-    {
-      uint16_t payloadLen;
+  return 1U;
+}
 
-      if ((quantity == 0U) || (quantity > 125U))
-      {
-        return 0U;  /* 异常不回复 */
-      }
-      if ((start + quantity) > MB_INPUT_REG_COUNT)
-      {
-        return 0U;  /* 异常不回复 */
-      }
-
-      if (isBroadcast != 0U)
-      {
-        return 0U;
-      }
-
-      payloadLen = (uint16_t)(3U + (2U * quantity));
-      if (responseMax < (payloadLen + 2U))
-      {
-        return 0U;
-      }
-
-      response[0] = MB_SLAVE_ADDR;
-      response[1] = function;
-      response[2] = (uint8_t)(2U * quantity);
-      for (i = 0U; i < quantity; ++i)
-      {
-        uint16_t reg = g_mbInputRegs[start + i];
-        response[3U + (2U * i)] = (uint8_t)((reg >> 8) & 0xFFU);
-        response[4U + (2U * i)] = (uint8_t)(reg & 0xFFU);
-      }
-
-      crcCalc = Modbus_Crc16(response, payloadLen);
-      response[payloadLen] = (uint8_t)(crcCalc & 0xFFU);
-      response[payloadLen + 1U] = (uint8_t)((crcCalc >> 8) & 0xFFU);
-      return (uint16_t)(payloadLen + 2U);
-    }
-
-    case 0x05U:
-    {
-      if ((start + 1U) > MB_COIL_COUNT)
-      {
-        return 0U;  /* 异常不回复 */
-      }
-
-      value = ((uint16_t)request[4] << 8) | (uint16_t)request[5];
-      if ((value != 0xFF00U) && (value != 0x0000U))
-      {
-        return 0U;  /* 异常不回复 */
-      }
-
-      Modbus_SetBit(g_mbCoils, start, MB_COIL_COUNT, (uint8_t)(value == 0xFF00U));
-      if (isBroadcast != 0U)
-      {
-        return 0U;
-      }
-
-      if (responseMax < requestLen)
-      {
-        return 0U;
-      }
-      memcpy(response, request, requestLen);
-      return requestLen;
-    }
-
-    case 0x06U:
-    {
-      if ((start + 1U) > MB_HOLDING_REG_COUNT)
-      {
-        return 0U;  /* 异常不回复 */
-      }
-
-      value = ((uint16_t)request[4] << 8) | (uint16_t)request[5];
-      g_mbHoldingRegs[start] = value;
-      if (isBroadcast != 0U)
-      {
-        return 0U;
-      }
-
-      if (responseMax < requestLen)
-      {
-        return 0U;
-      }
-      memcpy(response, request, requestLen);
-      return requestLen;
-    }
-
+static uint8_t Mb_ApplyWrite(const ModbusRequest_t *request, const uint8_t *frame, uint16_t frameLen)
+{
+  switch (request->function)
+  {
+    case MB_FC_WRITE_SINGLE_COIL:
+      return Mb_WriteSingleCoil(request);
+    case MB_FC_WRITE_SINGLE_REG:
+      return Mb_WriteSingleRegister(request);
+    case MB_FC_WRITE_MULTIPLE_COILS:
+      return Mb_WriteMultipleCoils(request, frame, frameLen);
+    case MB_FC_WRITE_MULTIPLE_REGS:
+      return Mb_WriteMultipleRegisters(request, frame, frameLen);
     default:
-      return 0U;  /* 不支持的功能码：不回复 */
+      return 0U;
   }
+}
+
+static uint16_t Mb_BuildWriteResponse(const ModbusRequest_t *request,
+                                      uint8_t *response,
+                                      uint16_t responseMax)
+{
+  if (responseMax < MB_MIN_FRAME_SIZE)
+  {
+    return 0U;
+  }
+
+  response[0] = MODBUS_SLAVE_ADDR;
+  response[1] = request->function;
+  Mb_WriteU16(&response[2], request->start);
+  Mb_WriteU16(&response[4], request->quantity);
+  return Mb_FinishResponse(response, 6U);
+}
+
+static uint16_t Mb_BuildReadResponse(const ModbusRequest_t *request,
+                                     uint8_t *response,
+                                     uint16_t responseMax)
+{
+  switch (request->function)
+  {
+    case MB_FC_READ_COILS:
+      return Mb_ReadBits(request, g_coils, MODBUS_SLAVE_COIL_COUNT, response, responseMax);
+    case MB_FC_READ_DISCRETE_INPUTS:
+      return Mb_ReadBits(request, g_discreteInputs, MODBUS_SLAVE_DISCRETE_COUNT, response, responseMax);
+    case MB_FC_READ_HOLDING_REGS:
+      return Mb_ReadRegisters(request, g_holdingRegs, MODBUS_SLAVE_HOLDING_REG_COUNT, response, responseMax);
+    case MB_FC_READ_INPUT_REGS:
+      return Mb_ReadRegisters(request, g_inputRegs, MODBUS_SLAVE_INPUT_REG_COUNT, response, responseMax);
+    default:
+      return 0U;
+  }
+}
+
+void ModbusSlave_InitData(void)
+{
+  memset(g_coils, 0, sizeof(g_coils));
+  memset(g_discreteInputs, 0, sizeof(g_discreteInputs));
+  memset(g_inputRegs, 0, sizeof(g_inputRegs));
+  memset(g_holdingRegs, 0, sizeof(g_holdingRegs));
+
+  g_inputRegs[0] = 0x1234U;
+  g_inputRegs[1] = 0x5678U;
+  g_holdingRegs[0] = 0x0001U;
+}
+
+void ModbusSlave_SetDiscreteInput(uint16_t address, uint8_t value)
+{
+  Mb_SetBit(g_discreteInputs, MODBUS_SLAVE_DISCRETE_COUNT, address, value);
+}
+
+void ModbusSlave_SetInputRegister(uint16_t address, uint16_t value)
+{
+  if (address >= MODBUS_SLAVE_INPUT_REG_COUNT)
+  {
+    return;
+  }
+
+  g_inputRegs[address] = value;
+}
+
+uint8_t ModbusSlave_GetCoil(uint16_t address)
+{
+  return Mb_GetBit(g_coils, MODBUS_SLAVE_COIL_COUNT, address);
+}
+
+uint16_t ModbusSlave_GetHoldingRegister(uint16_t address)
+{
+  if (address >= MODBUS_SLAVE_HOLDING_REG_COUNT)
+  {
+    return 0U;
+  }
+
+  return g_holdingRegs[address];
+}
+
+uint16_t ModbusSlave_HandleRequest(const uint8_t *request,
+                                   uint16_t requestLen,
+                                   uint8_t *response,
+                                   uint16_t responseMax)
+{
+  ModbusRequest_t parsed;
+
+  if (Mb_FrameValid(request, requestLen) == 0U)
+  {
+    return 0U;
+  }
+
+  Mb_ParseRequest(request, &parsed);
+  if (Mb_AddressMatches(&parsed) == 0U)
+  {
+    return 0U;
+  }
+
+  if (Mb_IsWriteFunction(parsed.function) != 0U)
+  {
+    if (Mb_ApplyWrite(&parsed, request, requestLen) == 0U)
+    {
+      return 0U;
+    }
+
+    if ((parsed.broadcast != 0U) || (response == NULL))
+    {
+      return 0U;
+    }
+
+    return Mb_BuildWriteResponse(&parsed, response, responseMax);
+  }
+
+  if (parsed.broadcast != 0U)
+  {
+    return 0U;
+  }
+
+  if (response == NULL)
+  {
+    return 0U;
+  }
+
+  return Mb_BuildReadResponse(&parsed, response, responseMax);
 }

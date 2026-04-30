@@ -24,6 +24,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "FreeRTOS.h"
+#include "modbus_host.h"
+#include "modbus_rtu.h"
 #include "task.h"
 
 /* USER CODE END Includes */
@@ -52,11 +54,34 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+static void ModbusHostTask(void *argument);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+static void ModbusHostTask(void *argument)
+{
+  uint8_t request[MODBUS_HOST_MAX_ADU_SIZE];
+  uint8_t response[MODBUS_HOST_MAX_ADU_SIZE];
+  uint16_t requestLen;
+  uint16_t writeValues[2] = {0x0001U, 0x0002U};
+  ModbusHost_ResponseInfo_t info;
+
+  (void)argument;
+
+  for (;;)
+  {
+    requestLen = ModbusHost_BuildReadHoldingReq(MODBUS_HOST_DEFAULT_SLAVE_ADDR, 0U, 2U, request, sizeof(request));
+    (void)ModbusHost_SendRequest(request, requestLen, response, sizeof(response), &info);
+
+    requestLen = ModbusHost_BuildWriteMultipleRegsReq(MODBUS_HOST_DEFAULT_SLAVE_ADDR, 0U, 2U, writeValues, request, sizeof(request));
+    (void)ModbusHost_SendRequest(request, requestLen, response, sizeof(response), &info);
+
+    vTaskDelay(pdMS_TO_TICKS(1000U));
+  }
+}
 
 /* USER CODE END 0 */
 
@@ -91,6 +116,13 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  if (ModbusHost_Init() == 0U)
+  {
+    Error_Handler();
+  }
+  ModbusRtu_Init(&huart1);
+  (void)xTaskCreate(ModbusHostTask, "mb_host", 384U, NULL, tskIDLE_PRIORITY + 1U, NULL);
+  vTaskStartScheduler();
 
   /* USER CODE END 2 */
 

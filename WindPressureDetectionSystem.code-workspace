@@ -1,9 +1,11 @@
 {
 	"folders": [
 		{
+			"name": "ControlBoard",
 			"path": "ControlBoard"
 		},
 		{
+			"name": "HostBoard",
 			"path": "HostBoard"
 		}
 	],
