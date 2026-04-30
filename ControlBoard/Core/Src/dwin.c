@@ -10,79 +10,117 @@
 /* Includes ------------------------------------------------------------------*/
 #include "dwin.h"
 #include "FreeRTOS.h"
+#include "queue.h"
 #include "semphr.h"
 #include "task.h"
 #include "usart.h"
 #include <string.h>
 
 /* USER CODE BEGIN 0 */
-/* 迪文屏 UART3 发送互斥锁：多个任务同时发送时按调用顺序串行发送。 */
-static SemaphoreHandle_t g_uart3TxMutex;
+#define DWIN_FRAME_MAX_DATA_LEN 8U  /* 当前最长一次写入 4 字节，留 8 字节余量。 */
+#define DWIN_QUEUE_LENGTH       16U /* 队列槽数：覆盖一轮 UpdateSensor 的 10 帧 + 状态变化帧。 */
+#define DWIN_TX_TIMEOUT_MS      100U
+
+typedef struct
+{
+  uint16_t addr;
+  uint8_t len;
+  uint8_t data[DWIN_FRAME_MAX_DATA_LEN];
+} DwinFrame_t;
+
+/* DWIN 发送队列：业务任务入队，DwinSendTask 出队后串行发送。 */
+static QueueHandle_t g_dwinQueue;
 /* UART3 中断发送完成信号量：发送完成或出错时由 HAL 回调释放。 */
 static SemaphoreHandle_t g_uart3TxDoneSem;
 /* UART3 当前是否有一帧正在发送。 */
 static volatile uint8_t g_uart3TxActive;
 /* UART3 最近一次中断发送结果。 */
 static volatile HAL_StatusTypeDef g_uart3TxStatus;
+/* 队列入队失败计数：用于诊断业务侧入队压力是否过大。 */
+static volatile uint32_t g_dwinQueueDropCount;
 
-uint8_t UART3_SendInit(void)
+/* 内部串行发送 UART3 一帧；仅 DwinSendTask 调用，因此无需互斥锁。 */
+static HAL_StatusTypeDef Dwin_TransmitFrame(const uint8_t *buf, uint16_t len)
 {
-  if (g_uart3TxMutex == NULL)
+  HAL_StatusTypeDef status;
+
+  if ((buf == NULL) || (len == 0U) || (g_uart3TxDoneSem == NULL))
   {
-    g_uart3TxMutex = xSemaphoreCreateMutex();
+    return HAL_ERROR;
   }
 
+  (void)xSemaphoreTake(g_uart3TxDoneSem, 0U);
+  g_uart3TxStatus = HAL_BUSY;
+  g_uart3TxActive = 1U;
+  status = HAL_UART_Transmit_IT(&huart3, (uint8_t *)buf, len);
+  if (status != HAL_OK)
+  {
+    g_uart3TxActive = 0U;
+    return status;
+  }
+
+  if (xSemaphoreTake(g_uart3TxDoneSem, pdMS_TO_TICKS(DWIN_TX_TIMEOUT_MS)) != pdTRUE)
+  {
+    g_uart3TxActive = 0U;
+    /* 超时时强制结束硬件发送，避免下一帧叠加在未完成的传输上。 */
+    (void)HAL_UART_AbortTransmit(&huart3);
+    return HAL_TIMEOUT;
+  }
+
+  return g_uart3TxStatus;
+}
+
+uint8_t DwinSend_Init(void)
+{
   if (g_uart3TxDoneSem == NULL)
   {
     g_uart3TxDoneSem = xSemaphoreCreateBinary();
   }
 
+  if (g_dwinQueue == NULL)
+  {
+    g_dwinQueue = xQueueCreate(DWIN_QUEUE_LENGTH, sizeof(DwinFrame_t));
+  }
+
   g_uart3TxActive = 0U;
   g_uart3TxStatus = HAL_OK;
-  return ((g_uart3TxMutex != NULL) && (g_uart3TxDoneSem != NULL)) ? 1U : 0U;
+  return ((g_uart3TxDoneSem != NULL) && (g_dwinQueue != NULL)) ? 1U : 0U;
 }
 
-HAL_StatusTypeDef UART3_Send(const uint8_t *buf, uint16_t len)
+uint32_t DwinSend_GetDropCount(void)
 {
-  HAL_StatusTypeDef status;
+  return g_dwinQueueDropCount;
+}
 
-  if ((buf == NULL) || (len == 0U) || (UART3_SendInit() == 0U))
+void DwinSendTask(void *argument)
+{
+  DwinFrame_t frame;
+  uint8_t buf[3U + 1U + 2U + DWIN_FRAME_MAX_DATA_LEN]; /* 帧头2 + LEN1 + 指令1 + 地址2 + data */
+
+  (void)argument;
+
+  for (;;)
   {
-    return HAL_ERROR;
-  }
-
-  (void)xSemaphoreTake(g_uart3TxMutex, portMAX_DELAY);
-  (void)xSemaphoreTake(g_uart3TxDoneSem, 0U);
-
-  do
-  {
-    g_uart3TxStatus = HAL_BUSY;
-    g_uart3TxActive = 1U;
-    status = HAL_UART_Transmit_IT(&huart3, (uint8_t *)buf, len);
-    if (status == HAL_BUSY)
+    if (xQueueReceive(g_dwinQueue, &frame, portMAX_DELAY) != pdTRUE)
     {
-      g_uart3TxActive = 0U;
-      vTaskDelay(pdMS_TO_TICKS(1U));
+      continue;
     }
-  } while (status == HAL_BUSY);
 
-  if (status == HAL_OK)
-  {
-    (void)xSemaphoreTake(g_uart3TxDoneSem, portMAX_DELAY);
-    status = g_uart3TxStatus;
-  }
-  else
-  {
-    g_uart3TxActive = 0U;
-  }
+    if ((frame.len == 0U) || (frame.len > DWIN_FRAME_MAX_DATA_LEN))
+    {
+      continue;
+    }
 
-  if (status != HAL_OK)
-  {
-    (void)HAL_UART_AbortTransmit(&huart3);
-  }
+    buf[0] = 0x5AU;
+    buf[1] = 0xA5U;
+    buf[2] = (uint8_t)(3U + frame.len);   /* LEN = 指令1 + 地址2 + 数据 */
+    buf[3] = 0x82U;                        /* 写变量指令 */
+    buf[4] = (uint8_t)(frame.addr >> 8);   /* 地址高字节 */
+    buf[5] = (uint8_t)(frame.addr & 0xFFU);/* 地址低字节 */
+    memcpy(&buf[6], frame.data, frame.len);
 
-  (void)xSemaphoreGive(g_uart3TxMutex);
-  return status;
+    (void)Dwin_TransmitFrame(buf, (uint16_t)(6U + frame.len));
+  }
 }
 
 void UART3_SendTxCpltCallback(UART_HandleTypeDef *huart)
@@ -130,24 +168,23 @@ void UART3_SendErrorCallback(UART_HandleTypeDef *huart)
  */
 void DWIN_WriteVar(uint16_t addr, const uint8_t *pData, uint8_t data_len)
 {
-    /* 当前项目中最大实际发送长度极小，
-     * 将其限制为 64 字节非常安全，并可节省约 200 字节的任务栈空间 */
-    if (pData == NULL || data_len == 0 || data_len > 64)
+    DwinFrame_t frame;
+
+    if ((pData == NULL) || (data_len == 0U) || (data_len > DWIN_FRAME_MAX_DATA_LEN) ||
+        (g_dwinQueue == NULL))
     {
         return;
     }
 
-    /* 总帧长 = 帧头(2) + LEN字段(1) + LEN内容(3+data_len) */
-    uint8_t buf[3 + 1 + 2 + 64];          /* 优化：减小最大帧缓冲限制以防止栈溢出 */
-    buf[0] = 0x5A;
-    buf[1] = 0xA5;
-    buf[2] = 3 + data_len;                  /* LEN */
-    buf[3] = 0x82;                          /* 写变量指令 */
-    buf[4] = (uint8_t)(addr >> 8);          /* 地址高字节 */
-    buf[5] = (uint8_t)(addr & 0xFF);        /* 地址低字节 */
-    memcpy(&buf[6], pData, data_len);       /* 数据段 */
+    frame.addr = addr;
+    frame.len = data_len;
+    memcpy(frame.data, pData, data_len);
 
-    (void)UART3_Send(buf, 6U + data_len);
+    /* 业务任务非阻塞入队；队列满则丢弃本帧，下一轮 maintenance 周期会重发。 */
+    if (xQueueSend(g_dwinQueue, &frame, 0U) != pdTRUE)
+    {
+        g_dwinQueueDropCount++;
+    }
 }
 
 void DwinIcon_WriteValue(uint16_t addr, uint8_t value)
@@ -191,68 +228,62 @@ void DwinValue_WriteFloat(uint16_t addr, float value)
   DWIN_WriteVar(addr, data, sizeof(data));
 }
 
-void DwinValue_UpdateSensor(uint8_t sensorIndex, const uint16_t *data, uint8_t forceUpdate)
+void DwinValue_UpdateSensor(uint8_t sensorIndex)
 {
-  uint16_t baseAddr = (uint16_t)(DWIN_SENSOR_DATA_ADDR + ((uint16_t)sensorIndex * DWIN_SENSOR_DATA_STRIDE));
+  /* 按传感器型号只发送相关数据项，避免对所有屏幕变量都做无意义写入：
+   *  - 风压传感器：仅风压 (float)
+   *  - CO 传感器：仅 CO (float, ppm = 原始值/100)
+   *  - 余压传感器：仅余压 (uint16)
+   *  - 七合一传感器：CO2/CH2O/TVOC/PM2.5/PM10/温度/湿度
+   * 这样 UART3 在屏幕刷新阶段的流量降到原先 1/3~1/10，屏幕响应也更快。 */
+  uint16_t baseAddr;
+  SensorModel_t model;
 
-  if ((data[GLOBAL_STATUS_DATA_CO] != g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_CO]) || (forceUpdate != 0U))
+  if (sensorIndex >= GLOBAL_STATUS_SENSOR_COUNT)
   {
-    float co = (float)g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_CO] / 100.0f;
-    DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_CO_OFFSET), co);
+    return;
   }
 
-  if ((data[GLOBAL_STATUS_DATA_WIND_PRESSURE] != g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_WIND_PRESSURE]) || (forceUpdate != 0U))
-  {
-    float windPressure = (float)g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_WIND_PRESSURE];
-    DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_WIND_OFFSET), windPressure);
-  }
+  baseAddr = (uint16_t)(DWIN_SENSOR_DATA_ADDR + ((uint16_t)sensorIndex * DWIN_SENSOR_DATA_STRIDE));
+  model = (SensorModel_t)SENSOR_MODEL(sensorIndex);
 
-  if ((data[GLOBAL_STATUS_DATA_RESIDUAL_PRESSURE] != g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_RESIDUAL_PRESSURE]) || (forceUpdate != 0U))
+  switch (model)
   {
-    DwinValue_WriteU16((uint16_t)(baseAddr + DWIN_SENSOR_DATA_RESIDUAL_OFFSET),
-                       g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_RESIDUAL_PRESSURE]);
-  }
+    case SENSOR_MODEL_WIND_PRESSURE:
+      DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_WIND_OFFSET),
+                           (float)SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_WIND_PRESSURE));
+      break;
 
-  if ((data[GLOBAL_STATUS_DATA_CO2] != g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_CO2]) || (forceUpdate != 0U))
-  {
-    DwinValue_WriteU16((uint16_t)(baseAddr + DWIN_SENSOR_DATA_CO2_OFFSET),
-                       g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_CO2]);
-  }
+    case SENSOR_MODEL_CO:
+      DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_CO_OFFSET),
+                           (float)SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_CO) / 100.0f);
+      break;
 
-  if ((data[GLOBAL_STATUS_DATA_CH2O] != g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_CH2O]) || (forceUpdate != 0U))
-  {
-    DwinValue_WriteU16((uint16_t)(baseAddr + DWIN_SENSOR_DATA_CH2O_OFFSET),
-                       g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_CH2O]);
-  }
+    case SENSOR_MODEL_RESIDUAL_PRESSURE:
+      DwinValue_WriteU16((uint16_t)(baseAddr + DWIN_SENSOR_DATA_RESIDUAL_OFFSET),
+                         SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_RESIDUAL_PRESSURE));
+      break;
 
-  if ((data[GLOBAL_STATUS_DATA_TVOC] != g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_TVOC]) || (forceUpdate != 0U))
-  {
-    DwinValue_WriteU16((uint16_t)(baseAddr + DWIN_SENSOR_DATA_TVOC_OFFSET),
-                       g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_TVOC]);
-  }
+    case SENSOR_MODEL_SEVEN_IN_ONE:
+      DwinValue_WriteU16((uint16_t)(baseAddr + DWIN_SENSOR_DATA_CO2_OFFSET),
+                         SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_CO2));
+      DwinValue_WriteU16((uint16_t)(baseAddr + DWIN_SENSOR_DATA_CH2O_OFFSET),
+                         SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_CH2O));
+      DwinValue_WriteU16((uint16_t)(baseAddr + DWIN_SENSOR_DATA_TVOC_OFFSET),
+                         SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_TVOC));
+      DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_PM25_OFFSET),
+                           (float)SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_PM25));
+      DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_PM10_OFFSET),
+                           (float)SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_PM10));
+      DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_TEMP_OFFSET),
+                           (float)SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_TEMPERATURE) / 10.0f);
+      DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_HUMI_OFFSET),
+                           (float)SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_HUMIDITY) / 10.0f);
+      break;
 
-  if ((data[GLOBAL_STATUS_DATA_PM25] != g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_PM25]) || (forceUpdate != 0U))
-  {
-    float pm25 = (float)g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_PM25];
-    DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_PM25_OFFSET), pm25);
-  }
-
-  if ((data[GLOBAL_STATUS_DATA_PM10] != g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_PM10]) || (forceUpdate != 0U))
-  {
-    float pm10 = (float)g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_PM10];
-    DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_PM10_OFFSET), pm10);
-  }
-
-  if ((data[GLOBAL_STATUS_DATA_TEMPERATURE] != g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_TEMPERATURE]) || (forceUpdate != 0U))
-  {
-    float temperature = (float)g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_TEMPERATURE] / 10.0f;
-    DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_TEMP_OFFSET), temperature);
-  }
-
-  if ((data[GLOBAL_STATUS_DATA_HUMIDITY] != g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_HUMIDITY]) || (forceUpdate != 0U))
-  {
-    float humidity = (float)g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_HUMIDITY] / 10.0f;
-    DwinValue_WriteFloat((uint16_t)(baseAddr + DWIN_SENSOR_DATA_HUMI_OFFSET), humidity);
+    default:
+      /* 未知/未识别型号不刷屏，避免向屏幕写入垃圾数据。 */
+      break;
   }
 }
 

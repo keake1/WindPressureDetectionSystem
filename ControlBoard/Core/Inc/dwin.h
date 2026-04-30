@@ -62,9 +62,11 @@ void DwinIcon_WriteValue(uint16_t addr, uint8_t value);
 uint8_t DwinIcon_GetSensorStatusValue(uint8_t online, uint8_t alarm);
 void DwinValue_WriteU16(uint16_t addr, uint16_t value);
 void DwinValue_WriteFloat(uint16_t addr, float value);
-void DwinValue_UpdateSensor(uint8_t sensorIndex, const uint16_t *data, uint8_t forceUpdate);
-uint8_t UART3_SendInit(void);
-HAL_StatusTypeDef UART3_Send(const uint8_t *buf, uint16_t len);
+void DwinValue_UpdateSensor(uint8_t sensorIndex);
+uint8_t DwinSend_Init(void);
+void DwinSendTask(void *argument);
+/* 返回 DWIN 发送队列累计丢帧计数，用于诊断上层入队压力是否超过 UART3 实际发送能力。 */
+uint32_t DwinSend_GetDropCount(void);
 void UART3_SendTxCpltCallback(UART_HandleTypeDef *huart);
 void UART3_SendErrorCallback(UART_HandleTypeDef *huart);
 

@@ -24,6 +24,7 @@
 
 /* USER CODE END 0 */
 
+/* USART1 句柄：HostBoard 上行 Modbus 主机端口。 */
 UART_HandleTypeDef huart1;
 
 /* USART1 init function */
@@ -117,4 +118,3 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
-

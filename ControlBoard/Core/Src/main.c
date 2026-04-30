@@ -18,12 +18,14 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "iwdg.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "FreeRTOS.h"
+#include "controller_maintenance.h"
 #include "dwin.h"
 #include "global_status.h"
 #include "modbus_rtu.h"
@@ -40,21 +42,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define CONTROLLER_ALARM_UPDATE_INTERVAL_MS 500U
-#define ALARM_SET_CO2_THRESHOLD             1000U
-#define ALARM_SET_CH2O_THRESHOLD            80U
-#define ALARM_SET_TVOC_THRESHOLD            600U
-#define ALARM_SET_PM25_THRESHOLD            35U
-#define ALARM_SET_PM10_THRESHOLD            50U
-#define ALARM_SET_CO_X100_THRESHOLD         2500U
-#define ALARM_CLEAR_CO2_THRESHOLD           800U
-#define ALARM_CLEAR_CH2O_THRESHOLD          70U
-#define ALARM_CLEAR_TVOC_THRESHOLD          500U
-#define ALARM_CLEAR_PM25_THRESHOLD          25U
-#define ALARM_CLEAR_PM10_THRESHOLD          40U
-#define ALARM_CLEAR_CO_X100_THRESHOLD       2000U
-#define DWIN_ICON_UPDATE_INTERVAL_MS        100U
-#define DWIN_VALUE_UPDATE_INTERVAL_MS       500U
 
 /* USER CODE END PD */
 
@@ -66,19 +53,19 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+/* 任务心跳计数：各工作任务每轮循环递增自己的计数，喂狗任务据此判断任务是否仍在运行。 */
+static volatile uint32_t g_slaveTaskHeartbeat;
+static volatile uint32_t g_sensorTaskHeartbeat;
 
+/* 任务心跳停滞超过该阈值视为任务挂死，停止喂狗等待 IWDG 复位。 */
+#define IWDG_TASK_STALE_TIMEOUT_MS 800U
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-static uint8_t ControllerAlarm_CalcSensorAlarm(const SensorInfo_t *sensor);
-static void ControllerAlarmTask(void *argument);
-static void ControllerStatusTask(void *argument);
-static void DwinIconTask(void *argument);
-static void DwinValueTask(void *argument);
-static void ModbusSensorOnlineTask(void *argument);
-static void ModbusSensorHostTask(void *argument);
+static void ControllerMaintenanceTask(void *argument);
+static void ModbusSensorTask(void *argument);
 static void ModbusSlaveTask(void *argument);
 
 /* USER CODE END PFP */
@@ -88,218 +75,103 @@ static void ModbusSlaveTask(void *argument);
 
 
 
-static void DwinIconTask(void *argument)
+static void ControllerMaintenanceTask(void *argument)
 {
-  uint8_t lastControllerAlarm = 0U;
-  uint8_t lastDuplicateAddress = 0U;
-  uint8_t lastZeroAddress = 0U;
-  uint8_t lastSensorOnline[GLOBAL_STATUS_SENSOR_COUNT];
-  uint8_t lastSensorAlarm[GLOBAL_STATUS_SENSOR_COUNT];
-  uint8_t i;
+  /* maintenanceState 体积较大（~350B），且不可重入。放 static 可让 ctrl_maint 任务栈缩小。 */
+  static ControllerMaintenanceState_t maintenanceState;
+  uint32_t lastSlaveHeartbeat = 0U;
+  uint32_t lastSensorHeartbeat = 0U;
+  TickType_t lastSlaveProgressTick;
+  TickType_t lastSensorProgressTick;
 
   (void)argument;
-
-  for (i = 0U; i < GLOBAL_STATUS_SENSOR_COUNT; ++i)
-  {
-    lastSensorOnline[i] = 0U;
-    lastSensorAlarm[i] = 0U;
-  }
+  ControllerMaintenance_Init(&maintenanceState);
+  lastSlaveProgressTick = xTaskGetTickCount();
+  lastSensorProgressTick = lastSlaveProgressTick;
 
   for (;;)
   {
-    if (g_controllerInfo.startupScanDone == 0U)
-    {
-      vTaskDelay(pdMS_TO_TICKS(100U));
-      continue;
-    }
+    ControllerMaintenance_Process(&maintenanceState);
 
-    if (g_controllerInfo.alarm != lastControllerAlarm)
+    /* 喂狗策略：只有当本任务、Modbus 从机任务、传感器任务三方心跳都健康时才喂狗。
+     * 启动扫描期间传感器任务可能数秒不返回，此期间跳过其心跳检查。 */
     {
-      uint8_t value = (g_controllerInfo.alarm != 0U) ? 1U : 0U;
-      DwinIcon_WriteValue(DWIN_GLOBAL_ALARM_ICON_ADDR, value);
-      DwinIcon_WriteValue(DWIN_WINDOWS_STATUS_ICON_ADDR, value);
-      lastControllerAlarm = g_controllerInfo.alarm;
-    }
+      TickType_t now = xTaskGetTickCount();
+      uint32_t slaveHb = g_slaveTaskHeartbeat;
+      uint32_t sensorHb = g_sensorTaskHeartbeat;
+      uint8_t slaveAlive;
+      uint8_t sensorAlive;
 
-    if (g_controllerInfo.hasDuplicateAddressSensor != lastDuplicateAddress)
-    {
-      DwinIcon_WriteValue(DWIN_DUP_ADDR_ICON_ADDR,
-                          (g_controllerInfo.hasDuplicateAddressSensor != 0U) ? 1U : 0U);
-      lastDuplicateAddress = g_controllerInfo.hasDuplicateAddressSensor;
-    }
-
-    if (g_controllerInfo.hasZeroAddressSensor != lastZeroAddress)
-    {
-      DwinIcon_WriteValue(DWIN_ZERO_ADDR_ICON_ADDR,
-                          (g_controllerInfo.hasZeroAddressSensor != 0U) ? 1U : 0U);
-      lastZeroAddress = g_controllerInfo.hasZeroAddressSensor;
-    }
-
-    for (i = 0U; i < GLOBAL_STATUS_SENSOR_COUNT; ++i)
-    {
-      uint8_t online = *g_sensorInfos[i].online;
-      uint8_t alarm = *g_sensorInfos[i].alarm;
-
-      if ((online != lastSensorOnline[i]) || (alarm != lastSensorAlarm[i]))
+      if (slaveHb != lastSlaveHeartbeat)
       {
-        uint16_t addr = (uint16_t)(DWIN_SENSOR_STATUS_ICON_ADDR + i);
-        DwinIcon_WriteValue(addr, DwinIcon_GetSensorStatusValue(online, alarm));
-        lastSensorOnline[i] = online;
-        lastSensorAlarm[i] = alarm;
+        lastSlaveHeartbeat = slaveHb;
+        lastSlaveProgressTick = now;
+      }
+      if (sensorHb != lastSensorHeartbeat)
+      {
+        lastSensorHeartbeat = sensorHb;
+        lastSensorProgressTick = now;
+      }
+
+      slaveAlive =
+        ((now - lastSlaveProgressTick) <= pdMS_TO_TICKS(IWDG_TASK_STALE_TIMEOUT_MS)) ? 1U : 0U;
+      sensorAlive = (g_controllerInfo.startupScanDone == 0U)
+                      ? 1U
+                      : (((now - lastSensorProgressTick) <= pdMS_TO_TICKS(IWDG_TASK_STALE_TIMEOUT_MS))
+                           ? 1U
+                           : 0U);
+
+      if ((slaveAlive != 0U) && (sensorAlive != 0U))
+      {
+        (void)HAL_IWDG_Refresh(&hiwdg);
       }
     }
 
-    vTaskDelay(pdMS_TO_TICKS(DWIN_ICON_UPDATE_INTERVAL_MS));
+    vTaskDelay(pdMS_TO_TICKS(CONTROLLER_MAINTENANCE_TASK_INTERVAL_MS));
   }
 }
 
-static void DwinValueTask(void *argument)
+static void ModbusSensorTask(void *argument)
 {
-  static uint16_t lastSensorData[GLOBAL_STATUS_SENSOR_COUNT][GLOBAL_STATUS_SENSOR_DATA_COUNT];
-  uint8_t lastSensorOnline[GLOBAL_STATUS_SENSOR_COUNT];
-  uint8_t lastControllerAddress = 0U;
-  uint8_t i;
+  uint8_t nextFullScanSensorIndex = 0U;
+  uint8_t nextOnlineSensorIndex = 0U;
+  uint8_t startupRound;
 
-  (void)argument;
-
-  for (i = 0U; i < GLOBAL_STATUS_SENSOR_COUNT; ++i)
-  {
-    lastSensorOnline[i] = 0U;
-  }
-
-  for (;;)
-  {
-    uint8_t controllerAddress = GPIO_ReadDeviceAddr();
-    if (controllerAddress != lastControllerAddress)
-    {
-      g_controllerInfo.controllerAddress = controllerAddress;
-      DwinValue_WriteU16(DWIN_CONTROL_BORAD_ADDR_VAR, controllerAddress);
-      lastControllerAddress = controllerAddress;
-    }
-
-    if (g_controllerInfo.startupScanDone != 0U)
-    {
-      for (i = 0U; i < GLOBAL_STATUS_SENSOR_COUNT; ++i)
-      {
-        uint8_t online = *g_sensorInfos[i].online;
-
-        if (online != 0U)
-        {
-          uint8_t forceUpdate = (lastSensorOnline[i] == 0U) ? 1U : 0U;
-          DwinValue_UpdateSensor(i, lastSensorData[i], forceUpdate);
-          memcpy(lastSensorData[i],
-                 g_sensorInfos[i].data,
-                 sizeof(lastSensorData[i]));
-        }
-
-        lastSensorOnline[i] = online;
-      }
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(DWIN_VALUE_UPDATE_INTERVAL_MS));
-  }
-}
-
-static void ControllerAlarmTask(void *argument)
-{
-  (void)argument;
-
-  for (;;)
-  {
-    uint8_t i;
-    uint8_t controllerAlarm = 0U;
-
-    if (g_controllerInfo.startupScanDone == 0U)
-    {
-      vTaskDelay(pdMS_TO_TICKS(100U));
-      continue;
-    }
-
-    for (i = 0U; i < GLOBAL_STATUS_SENSOR_COUNT; ++i)
-    {
-      uint8_t sensorAlarm = ControllerAlarm_CalcSensorAlarm(&g_sensorInfos[i]);
-      *g_sensorInfos[i].alarm = sensorAlarm;
-      if (sensorAlarm != 0U)
-      {
-        controllerAlarm = 1U;
-      }
-    }
-
-    g_controllerInfo.alarm = controllerAlarm;
-    vTaskDelay(pdMS_TO_TICKS(CONTROLLER_ALARM_UPDATE_INTERVAL_MS));
-  }
-}
-
-static void ModbusSensorHostTask(void *argument)
-{
   (void)argument;
 
   /* 下行轮询任务：ControlBoard 通过 USART1 依次读取 1~64 号传感器。 */
-  ModbusSensorHost_PollAll(MODBUS_SENSOR_STARTUP_SCAN_ROUNDS,
-                           MODBUS_SENSOR_FAST_REQUEST_INTERVAL_MS,
-                           MODBUS_SENSOR_DISCOVERY_RESPONSE_TIMEOUT_MS);
+  for (startupRound = 0U; startupRound < MODBUS_SENSOR_STARTUP_SCAN_ROUNDS; ++startupRound)
+  {
+    while ((ModbusSensorHost_Poll(MODBUS_SENSOR_POLL_ALL,
+                                  &nextFullScanSensorIndex,
+                                  MODBUS_SENSOR_COUNT,
+                                  0U,
+                                  MODBUS_SENSOR_DISCOVERY_RESPONSE_TIMEOUT_MS) &
+            MODBUS_SENSOR_POLL_RESULT_ROUND_DONE) == 0U)
+    {
+    }
+  }
   if (g_controllerInfo.errorResponseCount > GLOBAL_STATUS_DUPLICATE_ADDR_ERROR_THRESHOLD)
   {
     g_controllerInfo.hasDuplicateAddressSensor = 1U;
   }
   g_controllerInfo.startupScanDone = 1U;
+  nextFullScanSensorIndex = 0U;
 
   for (;;)
   {
-    ModbusSensorHost_PollAll(1U,
-                             MODBUS_SENSOR_NORMAL_REQUEST_INTERVAL_MS,
-                             MODBUS_SENSOR_DISCOVERY_RESPONSE_TIMEOUT_MS);
-  }
-}
-
-static void ControllerStatusTask(void *argument)
-{
-  uint32_t lastErrorResponseCount = 0U;
-  uint8_t baselineReady = 0U;
-
-  (void)argument;
-
-  for (;;)
-  {
-    if (g_controllerInfo.startupScanDone == 0U)
-    {
-      vTaskDelay(pdMS_TO_TICKS(500U));
-      continue;
-    }
-
-    if (baselineReady == 0U)
-    {
-      lastErrorResponseCount = g_controllerInfo.errorResponseCount;
-      baselineReady = 1U;
-    }
-
-    g_controllerInfo.hasZeroAddressSensor =
-      ModbusSensorHost_ProbeZeroAddress(MODBUS_SENSOR_ZERO_ADDR_RESPONSE_TIMEOUT_MS);
-
-    {
-      uint32_t currentErrorResponseCount = g_controllerInfo.errorResponseCount;
-      uint32_t errorIncrease = currentErrorResponseCount - lastErrorResponseCount;
-      g_controllerInfo.hasDuplicateAddressSensor =
-        (errorIncrease > GLOBAL_STATUS_DUPLICATE_ADDR_ERROR_THRESHOLD) ? 1U : 0U;
-      lastErrorResponseCount = currentErrorResponseCount;
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(GLOBAL_STATUS_UPDATE_INTERVAL_MS));
-  }
-}
-
-static void ModbusSensorOnlineTask(void *argument)
-{
-  (void)argument;
-
-  /* 在线传感器补充轮询：在线数量少时，提高已有数据的刷新频率。 */
-  for (;;)
-  {
-    if (ModbusSensorHost_PollOnline(MODBUS_SENSOR_ONLINE_REQUEST_INTERVAL_MS,
-                                    MODBUS_SENSOR_ONLINE_RESPONSE_TIMEOUT_MS) == 0U)
-    {
-      vTaskDelay(pdMS_TO_TICKS(MODBUS_SENSOR_ONLINE_IDLE_INTERVAL_MS));
-    }
+    (void)ModbusSensorHost_Poll(MODBUS_SENSOR_POLL_ALL,
+                                &nextFullScanSensorIndex,
+                                MODBUS_SENSOR_FULL_SCAN_BATCH_COUNT,
+                                MODBUS_SENSOR_NORMAL_REQUEST_INTERVAL_MS,
+                                MODBUS_SENSOR_DISCOVERY_RESPONSE_TIMEOUT_MS);
+    (void)ModbusSensorHost_Poll(MODBUS_SENSOR_POLL_ONLINE,
+                                &nextOnlineSensorIndex,
+                                1U,
+                                MODBUS_SENSOR_ONLINE_REQUEST_INTERVAL_MS,
+                                MODBUS_SENSOR_ONLINE_RESPONSE_TIMEOUT_MS);
+    g_sensorTaskHeartbeat++;
+    vTaskDelay(pdMS_TO_TICKS(MODBUS_SENSOR_POLL_CYCLE_INTERVAL_MS));
   }
 }
 
@@ -324,6 +196,7 @@ static void ModbusSlaveTask(void *argument)
       }
     }
 
+    g_slaveTaskHeartbeat++;
     vTaskDelay(pdMS_TO_TICKS(1U));
   }
 }
@@ -362,6 +235,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   /* USART2 是上行 Modbus 从机端口，USART1 是下行传感器 Modbus 主机端口。 */
   ModbusSlave_InitData();
@@ -373,17 +247,26 @@ int main(void)
   {
     Error_Handler();
   }
-  if (UART3_SendInit() == 0U)
+  if (DwinSend_Init() == 0U)
   {
     Error_Handler();
   }
-  (void)xTaskCreate(ModbusSlaveTask, "mb_slave", 256U, NULL, tskIDLE_PRIORITY + 1U, NULL);
-  (void)xTaskCreate(ModbusSensorHostTask, "mb_sensors", 384U, NULL, tskIDLE_PRIORITY + 1U, NULL);
-  (void)xTaskCreate(ModbusSensorOnlineTask, "mb_online", 384U, NULL, tskIDLE_PRIORITY + 1U, NULL);
-  (void)xTaskCreate(ControllerStatusTask, "ctrl_status", 256U, NULL, tskIDLE_PRIORITY + 1U, NULL);
-  (void)xTaskCreate(ControllerAlarmTask, "ctrl_alarm", 256U, NULL, tskIDLE_PRIORITY + 1U, NULL);
-  (void)xTaskCreate(DwinIconTask, "dwin_icons", 384U, NULL, tskIDLE_PRIORITY + 1U, NULL);
-  (void)xTaskCreate(DwinValueTask, "dwin_values", 512U, NULL, tskIDLE_PRIORITY + 1U, NULL);
+  if (xTaskCreate(ModbusSlaveTask, "mb_slave", 256U, NULL, tskIDLE_PRIORITY + 1U, NULL) != pdPASS)
+  {
+    Error_Handler();
+  }
+  if (xTaskCreate(ModbusSensorTask, "mb_sensors", 320U, NULL, tskIDLE_PRIORITY + 1U, NULL) != pdPASS)
+  {
+    Error_Handler();
+  }
+  if (xTaskCreate(ControllerMaintenanceTask, "ctrl_maint", 256U, NULL, tskIDLE_PRIORITY + 1U, NULL) != pdPASS)
+  {
+    Error_Handler();
+  }
+  if (xTaskCreate(DwinSendTask, "dwin_tx", 192U, NULL, tskIDLE_PRIORITY + 1U, NULL) != pdPASS)
+  {
+    Error_Handler();
+  }
   vTaskStartScheduler();
 
   /* USER CODE END 2 */
@@ -412,8 +295,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL6;
@@ -445,80 +329,6 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
-{
-  (void)xTask;
-  (void)pcTaskName;
-  __disable_irq();
-  while (1)
-  {
-  }
-}
-
-static uint8_t ControllerAlarm_CalcSensorAlarm(const SensorInfo_t *sensor)
-{
-  uint8_t nowAlarm;
-
-  if ((sensor == NULL) ||
-      (*sensor->online == 0U))
-  {
-    return 0U;
-  }
-
-  if ((*sensor->model != SENSOR_MODEL_CO) &&
-      (*sensor->model != SENSOR_MODEL_SEVEN_IN_ONE))
-  {
-    return 0U;
-  }
-
-  nowAlarm = *sensor->alarm;
-  if (nowAlarm == 0U)
-  {
-    /* 当前正常：CO 数据按实际 ppm * 100 保存，阈值也使用 x100 单位。 */
-    if (*sensor->model == SENSOR_MODEL_CO)
-    {
-      if (sensor->data[GLOBAL_STATUS_DATA_CO] > ALARM_SET_CO_X100_THRESHOLD)
-      {
-        nowAlarm = 1U;
-      }
-    }
-    else if (*sensor->model == SENSOR_MODEL_SEVEN_IN_ONE)
-    {
-      if ((sensor->data[GLOBAL_STATUS_DATA_CO2] > ALARM_SET_CO2_THRESHOLD) ||
-          (sensor->data[GLOBAL_STATUS_DATA_CH2O] > ALARM_SET_CH2O_THRESHOLD) ||
-          (sensor->data[GLOBAL_STATUS_DATA_TVOC] > ALARM_SET_TVOC_THRESHOLD) ||
-          (sensor->data[GLOBAL_STATUS_DATA_PM25] > ALARM_SET_PM25_THRESHOLD) ||
-          (sensor->data[GLOBAL_STATUS_DATA_PM10] > ALARM_SET_PM10_THRESHOLD))
-      {
-        nowAlarm = 1U;
-      }
-    }
-  }
-  else
-  {
-    /* 当前报警：CO 传感器按 x100 单位恢复，七合一传感器需所有参与项均低于恢复下限。 */
-    if (*sensor->model == SENSOR_MODEL_CO)
-    {
-      if (sensor->data[GLOBAL_STATUS_DATA_CO] < ALARM_CLEAR_CO_X100_THRESHOLD)
-      {
-        nowAlarm = 0U;
-      }
-    }
-    else if (*sensor->model == SENSOR_MODEL_SEVEN_IN_ONE)
-    {
-      if ((sensor->data[GLOBAL_STATUS_DATA_CO2] < ALARM_CLEAR_CO2_THRESHOLD) &&
-          (sensor->data[GLOBAL_STATUS_DATA_CH2O] < ALARM_CLEAR_CH2O_THRESHOLD) &&
-          (sensor->data[GLOBAL_STATUS_DATA_TVOC] < ALARM_CLEAR_TVOC_THRESHOLD) &&
-          (sensor->data[GLOBAL_STATUS_DATA_PM25] < ALARM_CLEAR_PM25_THRESHOLD) &&
-          (sensor->data[GLOBAL_STATUS_DATA_PM10] < ALARM_CLEAR_PM10_THRESHOLD))
-      {
-        nowAlarm = 0U;
-      }
-    }
-  }
-
-  return nowAlarm;
-}
 /* USER CODE END 4 */
 
 /**

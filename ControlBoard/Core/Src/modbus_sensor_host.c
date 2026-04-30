@@ -18,42 +18,6 @@
 static UART_HandleTypeDef *g_sensorUart;
 /* 保护 USART1 上完整请求-响应事务的互斥锁。 */
 static SemaphoreHandle_t g_requestMutex;
-/* 每个传感器最近一次轮询结果，用于调试和后续状态判断。 */
-static ModbusSensor_Status_t g_sensorStatus[MODBUS_SENSOR_COUNT];
-
-static uint16_t Mb_Crc16(const uint8_t *data, uint16_t length)
-{
-  uint16_t crc = 0xFFFFU;
-  uint16_t pos;
-  uint8_t bit;
-
-  for (pos = 0U; pos < length; ++pos)
-  {
-    crc ^= (uint16_t)data[pos];
-    for (bit = 0U; bit < 8U; ++bit)
-    {
-      uint16_t carry = crc & 0x0001U;
-      crc >>= 1U;
-      if (carry != 0U)
-      {
-        crc ^= 0xA001U;
-      }
-    }
-  }
-
-  return crc;
-}
-
-static void Mb_WriteU16(uint8_t *data, uint16_t value)
-{
-  data[0] = (uint8_t)(value >> 8);
-  data[1] = (uint8_t)value;
-}
-
-static uint16_t Mb_ReadU16(const uint8_t *data)
-{
-  return ((uint16_t)data[0] << 8) | (uint16_t)data[1];
-}
 
 static uint16_t Mb_BuildFixedReadReq(uint8_t slaveAddr, uint8_t *request, uint16_t requestMax)
 {
@@ -66,9 +30,9 @@ static uint16_t Mb_BuildFixedReadReq(uint8_t slaveAddr, uint8_t *request, uint16
 
   request[0] = slaveAddr;
   request[1] = MB_FC_READ_HOLDING_REGS;
-  Mb_WriteU16(&request[2], MB_READ_START_REG);
-  Mb_WriteU16(&request[4], MB_READ_REG_COUNT);
-  crc = Mb_Crc16(request, 6U);
+  ModbusRtu_WriteU16BE(&request[2], MB_READ_START_REG);
+  ModbusRtu_WriteU16BE(&request[4], MB_READ_REG_COUNT);
+  crc = ModbusRtu_Crc16(request, 6U);
   request[6] = (uint8_t)crc;
   request[7] = (uint8_t)(crc >> 8);
   return MB_READ_REQ_SIZE;
@@ -80,7 +44,7 @@ static void SensorHost_ClearData(uint8_t sensorIndex)
 
   for (i = 0U; i < GLOBAL_STATUS_SENSOR_DATA_COUNT; ++i)
   {
-    g_sensorInfos[sensorIndex].data[i] = 0U;
+    SENSOR_DATA(sensorIndex, i) = 0U;
   }
 }
 
@@ -118,27 +82,27 @@ static ModbusSensor_Status_t SensorHost_ParsePayload(uint8_t sensorIndex,
 
   /* 同一个传感器只填自己有关的数据项，其余统一清 0，避免保留旧型号的残留数据。 */
   SensorHost_ClearData(sensorIndex);
-  *g_sensorInfos[sensorIndex].model = (uint16_t)model;
+  SENSOR_MODEL(sensorIndex) = (uint16_t)model;
 
   switch (model)
   {
     case SENSOR_MODEL_WIND_PRESSURE:
-      g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_WIND_PRESSURE] = Mb_ReadU16(&payload[1]);
+      SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_WIND_PRESSURE) = ModbusRtu_ReadU16BE(&payload[1]);
       break;
     case SENSOR_MODEL_CO:
-      g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_CO] = Mb_ReadU16(&payload[1]);
+      SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_CO) = ModbusRtu_ReadU16BE(&payload[1]);
       break;
     case SENSOR_MODEL_RESIDUAL_PRESSURE:
-      g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_RESIDUAL_PRESSURE] = Mb_ReadU16(&payload[1]);
+      SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_RESIDUAL_PRESSURE) = ModbusRtu_ReadU16BE(&payload[1]);
       break;
     case SENSOR_MODEL_SEVEN_IN_ONE:
-      g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_CO2] = Mb_ReadU16(&payload[1]);
-      g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_CH2O] = Mb_ReadU16(&payload[3]);
-      g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_TVOC] = Mb_ReadU16(&payload[5]);
-      g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_PM25] = Mb_ReadU16(&payload[7]);
-      g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_PM10] = Mb_ReadU16(&payload[9]);
-      g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_TEMPERATURE] = Mb_ReadU16(&payload[11]);
-      g_sensorInfos[sensorIndex].data[GLOBAL_STATUS_DATA_HUMIDITY] = Mb_ReadU16(&payload[13]);
+      SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_CO2)         = ModbusRtu_ReadU16BE(&payload[1]);
+      SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_CH2O)        = ModbusRtu_ReadU16BE(&payload[3]);
+      SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_TVOC)        = ModbusRtu_ReadU16BE(&payload[5]);
+      SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_PM25)        = ModbusRtu_ReadU16BE(&payload[7]);
+      SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_PM10)        = ModbusRtu_ReadU16BE(&payload[9]);
+      SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_TEMPERATURE) = ModbusRtu_ReadU16BE(&payload[11]);
+      SENSOR_DATA(sensorIndex, GLOBAL_STATUS_DATA_HUMIDITY)    = ModbusRtu_ReadU16BE(&payload[13]);
       break;
     default:
       return MODBUS_SENSOR_STATUS_FRAME_ERROR;
@@ -168,7 +132,7 @@ static ModbusSensor_Status_t SensorHost_ParseResponse(uint8_t slaveAddr,
   }
 
   crcRx = (uint16_t)response[responseLen - 2U] | ((uint16_t)response[responseLen - 1U] << 8);
-  crcCalc = Mb_Crc16(response, (uint16_t)(responseLen - 2U));
+  crcCalc = ModbusRtu_Crc16(response, (uint16_t)(responseLen - 2U));
   if (crcRx != crcCalc)
   {
     return MODBUS_SENSOR_STATUS_CRC_ERROR;
@@ -243,8 +207,6 @@ static ModbusSensor_Status_t SensorHost_ReadOne(uint8_t slaveAddr, uint8_t senso
 
 uint8_t ModbusSensorHost_Init(UART_HandleTypeDef *uart)
 {
-  uint8_t i;
-
   if (uart == NULL)
   {
     return 0U;
@@ -261,27 +223,20 @@ uint8_t ModbusSensorHost_Init(UART_HandleTypeDef *uart)
     return 0U;
   }
 
-  for (i = 0U; i < MODBUS_SENSOR_COUNT; ++i)
-  {
-    g_sensorStatus[i] = MODBUS_SENSOR_STATUS_TIMEOUT;
-  }
-
   return ModbusRtu_InitPort(g_sensorUart);
 }
 
 static void SensorHost_UpdateStatus(uint8_t sensorIndex, ModbusSensor_Status_t status)
 {
-  g_sensorStatus[sensorIndex] = status;
-
   if (status == MODBUS_SENSOR_STATUS_OK)
   {
-    *g_sensorInfos[sensorIndex].online = 1U;
+    SENSOR_ONLINE(sensorIndex) = 1U;
     g_sensorInfos[sensorIndex].lastResponseTime = HAL_GetTick();
   }
   else if (status == MODBUS_SENSOR_STATUS_TIMEOUT)
   {
     /* 超时可能是传感器离线或通信故障，在线标志清 0，等待下一轮扫描更新。 */
-    *g_sensorInfos[sensorIndex].online = 0U;
+    SENSOR_ONLINE(sensorIndex) = 0U;
   }
   else
   {
@@ -290,66 +245,66 @@ static void SensorHost_UpdateStatus(uint8_t sensorIndex, ModbusSensor_Status_t s
   }
 }
 
-void ModbusSensorHost_PollAll(uint16_t scanRounds, uint32_t requestIntervalMs, uint32_t responseTimeoutMs)
+uint8_t ModbusSensorHost_Poll(ModbusSensorPollMode_t mode,
+                              uint8_t *nextSensorIndex,
+                              uint8_t maxPollCount,
+                              uint32_t requestIntervalMs,
+                              uint32_t responseTimeoutMs)
 {
-  uint16_t round;
-  uint8_t i;
+  uint8_t checkedCount = 0U;
+  uint8_t polledCount;
+  uint8_t result = MODBUS_SENSOR_POLL_RESULT_NONE;
 
-  if ((scanRounds == 0U) || (responseTimeoutMs == 0U))
+  if ((nextSensorIndex == NULL) ||
+      (maxPollCount == 0U) ||
+      (responseTimeoutMs == 0U) ||
+      ((mode != MODBUS_SENSOR_POLL_ALL) && (mode != MODBUS_SENSOR_POLL_ONLINE)))
   {
-    return;
+    return MODBUS_SENSOR_POLL_RESULT_NONE;
   }
 
-  for (round = 0U; round < scanRounds; ++round)
+  if (*nextSensorIndex >= MODBUS_SENSOR_COUNT)
   {
-    for (i = 0U; i < MODBUS_SENSOR_COUNT; ++i)
+    *nextSensorIndex = 0U;
+  }
+
+  for (polledCount = 0U;
+       (polledCount < maxPollCount) && (checkedCount < MODBUS_SENSOR_COUNT);
+       ++checkedCount)
+  {
+    uint8_t sensorIndex = *nextSensorIndex;
+
+    *nextSensorIndex = (uint8_t)(sensorIndex + 1U);
+    if (*nextSensorIndex >= MODBUS_SENSOR_COUNT)
     {
-      uint8_t slaveAddr = (uint8_t)(MODBUS_SENSOR_FIRST_ADDR + i);
-      ModbusSensor_Status_t status = SensorHost_ReadOne(slaveAddr, i, responseTimeoutMs);
-      SensorHost_UpdateStatus(i, status);
-
-      if ((requestIntervalMs > 0U) &&
-          ((round < (uint16_t)(scanRounds - 1U)) || (i < (MODBUS_SENSOR_COUNT - 1U))))
-      {
-        /* 当前传感器收到回复或等待超时后，先停顿一段时间再请求下一个传感器。 */
-        vTaskDelay(pdMS_TO_TICKS(requestIntervalMs));
-      }
+      *nextSensorIndex = 0U;
+      result |= MODBUS_SENSOR_POLL_RESULT_ROUND_DONE;
     }
-  }
-}
 
-uint8_t ModbusSensorHost_PollOnline(uint32_t requestIntervalMs, uint32_t responseTimeoutMs)
-{
-  uint8_t i;
-  uint8_t polledCount = 0U;
-
-  if (responseTimeoutMs == 0U)
-  {
-    return 0U;
-  }
-
-  for (i = 0U; i < MODBUS_SENSOR_COUNT; ++i)
-  {
-    if (*g_sensorInfos[i].online == 0U)
+    if ((mode == MODBUS_SENSOR_POLL_ONLINE) && (SENSOR_ONLINE(sensorIndex) == 0U))
     {
       continue;
     }
 
     {
-      uint8_t slaveAddr = (uint8_t)(MODBUS_SENSOR_FIRST_ADDR + i);
-      ModbusSensor_Status_t status = SensorHost_ReadOne(slaveAddr, i, responseTimeoutMs);
-      SensorHost_UpdateStatus(i, status);
+      uint8_t slaveAddr = (uint8_t)(MODBUS_SENSOR_FIRST_ADDR + sensorIndex);
+      ModbusSensor_Status_t status = SensorHost_ReadOne(slaveAddr, sensorIndex, responseTimeoutMs);
+      SensorHost_UpdateStatus(sensorIndex, status);
       polledCount++;
+      result |= MODBUS_SENSOR_POLL_RESULT_POLLED;
     }
 
-    if (requestIntervalMs > 0U)
+    if ((requestIntervalMs > 0U) &&
+        ((mode == MODBUS_SENSOR_POLL_ONLINE) ||
+         ((polledCount < maxPollCount) &&
+          ((result & MODBUS_SENSOR_POLL_RESULT_ROUND_DONE) == 0U))))
     {
-      /* 在线传感器数量少时也保留间隔，避免一轮结束后立刻重新请求同一传感器。 */
+      /* 保留请求间隔，避免同一条 RS485 总线连续请求过密。 */
       vTaskDelay(pdMS_TO_TICKS(requestIntervalMs));
     }
   }
 
-  return polledCount;
+  return result;
 }
 
 uint8_t ModbusSensorHost_ProbeZeroAddress(uint32_t responseTimeoutMs)

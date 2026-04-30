@@ -36,7 +36,9 @@ extern int __io_putchar(int ch) __attribute__((weak));
 extern int __io_getchar(void) __attribute__((weak));
 
 
+/* C 运行库环境变量表：裸机环境下固定为空。 */
 char *__env[1] = { 0 };
+/* C 运行库环境变量入口指针：指向空环境变量表。 */
 char **environ = __env;
 
 
@@ -206,16 +208,13 @@ static int starm_getc(FILE *file)
 	return c;
 }
 
-// Define and initialize the standard I/O streams for Picolibc.
-// FDEV_SETUP_STREAM connects the starm_putc and starm_getc helper functions to a FILE structure.
-// _FDEV_SETUP_RW indicates the stream is for reading and writing.
+/* Picolibc 标准 I/O 后备对象：连接 starm_putc/starm_getc 到 FILE 结构。 */
 static FILE __stdio = FDEV_SETUP_STREAM(starm_putc,
 					starm_getc,
 					NULL,
 					_FDEV_SETUP_RW);
 
-// Assign the standard stream pointers (stdin, stdout, stderr) to the initialized stream.
-// Picolibc uses these pointers for standard I/O operations (printf, scanf, etc.).
+/* 标准输入流指针：stdout/stderr 通过强引用复用同一个 FILE 对象。 */
 FILE *const stdin = &__stdio;
 __strong_reference(stdin, stdout);
 __strong_reference(stdin, stderr);

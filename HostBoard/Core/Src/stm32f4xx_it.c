@@ -60,6 +60,7 @@ extern void xPortSysTickHandler(void);
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+/* USART1 句柄：中断中分发 HostBoard 上行 Modbus 收发事件。 */
 extern UART_HandleTypeDef huart1;
 /* USER CODE BEGIN EV */
 

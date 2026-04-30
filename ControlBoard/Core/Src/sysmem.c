@@ -28,6 +28,7 @@
 /**
  * Pointer to the current high watermark of the heap usage
  */
+/* newlib 堆顶指针：记录 _sbrk 已分配到的最高地址。 */
 static uint8_t *__sbrk_heap_end = NULL;
 
 /**

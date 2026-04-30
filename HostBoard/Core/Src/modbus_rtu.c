@@ -7,17 +7,29 @@
 
 #define MODBUS_RTU_FRAME_GAP_MS 5U
 
+/* RTU 使用的 UART 句柄，HostBoard 当前固定为 USART1。 */
 static UART_HandleTypeDef *g_uart;
+/* RTU 发送互斥锁：串行化同一 UART 上的发送操作。 */
 static SemaphoreHandle_t g_txMutex;
+/* RTU 发送完成信号量：由发送完成/错误回调释放。 */
 static SemaphoreHandle_t g_txDoneSem;
+/* RTU 接收中断的单字节缓存。 */
 static uint8_t g_rxByte;
+/* RTU 接收状态标志：收到至少一个字节后置位。 */
 static volatile uint8_t g_receiving;
+/* RTU 接收溢出标志：帧长度超过缓存时置位并丢弃该帧。 */
 static volatile uint8_t g_overflow;
+/* RTU 发送状态标志：中断发送尚未结束时置位。 */
 static volatile uint8_t g_txActive;
+/* RTU 最近一次中断发送结果。 */
 static volatile HAL_StatusTypeDef g_txStatus;
+/* RTU 当前接收帧长度。 */
 static volatile uint16_t g_rxLen;
+/* RTU 最近一次接收字节的系统 tick，用于判断帧间隔。 */
 static volatile uint32_t g_lastRxTick;
+/* RTU 最近一次发送完成的系统 tick，用于控制帧间隔。 */
 static volatile uint32_t g_lastTxDoneTick;
+/* RTU 接收帧缓存。 */
 static uint8_t g_rxBuffer[MODBUS_RTU_MAX_FRAME_SIZE];
 
 static TickType_t ModbusRtu_MsToTicksCeil(uint32_t ms)

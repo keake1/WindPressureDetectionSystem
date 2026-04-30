@@ -18,6 +18,7 @@
 #define MB_FC_WRITE_MULTIPLE_REGS     0x10U
 #define MB_BASIC_REQ_SIZE             8U
 
+/* Modbus 主机请求互斥锁：保证一次请求-响应事务不会被其他任务插入。 */
 static SemaphoreHandle_t g_requestMutex;
 
 uint8_t ModbusHost_Init(void)

@@ -97,9 +97,12 @@
                is no need to call the 2 first functions listed above, since SystemCoreClock
                variable is updated automatically.
   */
+/* 系统核心时钟频率缓存：HAL/CMSIS 使用该值计算 SysTick 和外设时钟。 */
 uint32_t SystemCoreClock = 8000000;
 
+/* AHB 预分频查表：CMSIS 根据 RCC 配置换算 HCLK 时使用。 */
 const uint8_t AHBPrescTable[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};
+/* APB 预分频查表：CMSIS 根据 RCC 配置换算 PCLK 时使用。 */
 const uint8_t APBPrescTable[8]  = {0, 0, 0, 0, 1, 2, 3, 4};
 
 /**
@@ -246,4 +249,3 @@ void SystemCoreClockUpdate (void)
 /**
   * @}
   */
-
