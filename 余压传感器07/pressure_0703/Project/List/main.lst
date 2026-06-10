@@ -1,0 +1,200 @@
+C51 COMPILER V9.54   MAIN                                                                  08/04/2025 19:51:52 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN ..\hex文件\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\User\main.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App) DEB
+                    -UG OBJECTEXTEND PRINT(.\List\main.lst) TABS(2) OBJECT(..\hex文件\main.obj)
+
+line level    source
+
+   1          #include "uart1.h"
+   2          #include "uart2.h"
+   3          #include "delay.h"
+   4          #include "stdio.h"
+   5          #include "digital_cube.h"
+   6          #include "addr.h"
+   7          #include "ModeBusRTU.h"
+   8          #include "timer0.h"
+   9          #include "SPL06_001.h"
+  10          #include "SPL07_003.h"
+  11          
+  12          unsigned int d_pressure = 0;
+  13          
+  14          float pressure = 0, origin_pressure = 0, temperature = 0;
+  15          void main()
+  16          {
+  17   1        
+  18   1        P0M1 = 0;   P0M0 = 0;   
+  19   1        P1M1 = 0;   P1M0 = 0;   
+  20   1        P2M1 = 0;   P2M0 = 0;   
+  21   1        P3M1 = 0;   P3M0 = 0;   
+  22   1        P5M1 = 0;   P5M0 = 0;   
+  23   1        P2M0 |= 0x01 << 2;
+  24   1        //LED推挽输出
+  25   1        P2M1 &= ~(0x01 << 2);
+  26   1        P3M0 |= 0x01 << 4;
+  27   1        P3M1 &= ~(0x01) << 4;
+  28   1        P22 = 1;
+  29   1        P34 = 1;
+  30   1        addr_init();
+  31   1        do {
+  32   2          spl0703_init();
+  33   2          temperature = user_spl0703_get_temperature();
+  34   2          origin_pressure = user_spl0703_get_presure(); 
+  35   2        } while(origin_pressure < 90000 || temperature > 70);
+  36   1      //  spl0703_init();
+  37   1      //    temperature = user_spl0703_get_temperature();
+  38   1      //    origin_pressure = user_spl0703_get_presure(); 
+  39   1        Delay_xms(1000);
+  40   1        Delay_xms(1000);  
+  41   1        Timer0_Config(STC_1T, 1000);
+  42   1        digital_cube_init();
+  43   1        address = addr_read();
+  44   1        UART1_config(UART1_P30P31,11059200,9600);
+  45   1        UART2_config(UART2_P10P11,11059200,9600);
+  46   1      
+  47   1        EA = 1;
+  48   1      
+  49   1        while(1) {
+  50   2          
+  51   2          Digital_Tube_ShowNum((unsigned int)d_pressure % 1000);
+  52   2          //Digital_Tube_ShowNum((int)(CO_Value));
+  53   2          //Digital_Tube_ShowNum(ad_value % 1000);
+  54   2      
+C51 COMPILER V9.54   MAIN                                                                  08/04/2025 19:51:52 PAGE 2   
+
+  55   2        }
+  56   1      }
+  57          
+  58          
+  59          void error_handle(void)
+  60          {
+  61   1        if (Reg[0x0004] == 1) {
+  62   2          P34 = 0;
+  63   2        }
+  64   1        else {
+  65   2          P34 = 1;
+  66   2        }
+  67   1      }
+  68          
+  69          
+  70          void Pressure_reg0002_write()
+  71          {
+  72   1        float a;
+  73   1        //获取气压计的值
+  74   1        temperature = user_spl0703_get_temperature();
+  75   1        pressure  = user_spl0703_get_presure();
+  76   1        
+  77   1        
+  78   1        a = (float)(pressure - origin_pressure);
+  79   1        
+  80   1        if (a <= 0 )
+  81   1          d_pressure = 0;
+  82   1        else
+  83   1          d_pressure = (uint16_t)a;
+  84   1        Reg[0x0002] = (uint16_t)d_pressure;
+  85   1      
+  86   1      }
+  87          
+  88          void Pressure_Reg0003_Read()
+  89          {
+  90   1        if (Reg[0x0003] == 0x0001) {
+  91   2          temperature = user_spl0703_get_temperature();
+  92   2          origin_pressure = user_spl0703_get_presure();
+  93   2          Reg[0x0003] = 0x0000;
+  94   2        }
+  95   1      }
+  96          
+  97          
+  98          
+  99          
+ 100          void run_1ms(void)
+ 101          {
+ 102   1        if (uart_send_flag) {
+ 103   2          UART2_sendArray(ModBusSendBuf_len, ModBusSendBuf);
+ 104   2          UART1_sendArray(ModBusSendBuf_len, ModBusSendBuf);
+ 105   2          
+ 106   2          uart_send_flag = 0;
+ 107   2          //Delay_xms(5);
+ 108   2        }
+ 109   1        Digital_Tube_flash();
+ 110   1        //Time++;
+ 111   1        cnt++;
+ 112   1        if (cnt >= 10) {
+ 113   2          cnt = 0;
+ 114   2          //UART1_sendArray(Res_cnt, ModbusReceiveBuf);
+ 115   2          ModBus_ReadOneByte();
+ 116   2          
+C51 COMPILER V9.54   MAIN                                                                  08/04/2025 19:51:52 PAGE 3   
+
+ 117   2          //P34 = ~P34;
+ 118   2        }
+ 119   1      }
+ 120          
+ 121          void run_500ms(void)
+ 122          {
+ 123   1      //  char temp[40];
+ 124   1        P22 = ~P22;
+ 125   1      //  sprintf(temp, "p:%.0f，d:%d\r\nt:%d\r\norigin:%.0f", pressure, d_pressure, (int)temperature, origin_pre
+             -ssure);
+ 126   1      //  PrintString1(temp);
+ 127   1        
+ 128   1      }
+ 129          
+ 130          void run_10ms(void)
+ 131          {
+ 132   1        
+ 133   1      }
+ 134          
+ 135          void run_100ms(void)
+ 136          {
+ 137   1        error_handle();
+ 138   1        Pressure_Reg0003_Read();
+ 139   1        Pressure_reg0002_write();
+ 140   1        
+ 141   1      }
+ 142          
+ 143          uint8 count10ms;
+ 144          uint16 count500ms;
+ 145          uint8 count100ms;
+ 146          
+ 147          //1ms1次
+ 148          //void Timer2() interrupt TIMER2_VECTOR
+ 149          void Timer0() interrupt TIMER0_VECTOR
+ 150          { 
+ 151   1        run_1ms();
+ 152   1        count10ms++;
+ 153   1        count500ms++;
+ 154   1        count100ms++;
+ 155   1        if (count10ms >= 10) {
+ 156   2          run_10ms();
+ 157   2          count10ms = 0;
+ 158   2        }
+ 159   1        if (count100ms >= 100) {
+ 160   2          run_100ms();
+ 161   2          count100ms = 0;
+ 162   2        }
+ 163   1        
+ 164   1        if (count500ms >= 500) {
+ 165   2          run_500ms();
+ 166   2          count500ms = 0;
+ 167   2        }
+ 168   1      }
+ 169          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    624    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     18       4
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+C51 COMPILER V9.54   MAIN                                                                  08/04/2025 19:51:52 PAGE 4   
+
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,4 @@
+*.md
+*.code-workspace
+.claude/
+
