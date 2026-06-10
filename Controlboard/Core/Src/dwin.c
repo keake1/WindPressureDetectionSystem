@@ -98,9 +98,9 @@ static void FloatToBigEndian(float val, uint8_t *out)
  * 所有帧类型共用同一个 static 缓冲区。
  * 同一时刻只有一帧在发送（dwin_tx_busy 互斥），因此安全。
  *
- * 最大帧 = 状态帧：6 字节帧头 + 68 地址 × 2 字节 = 142 字节
+ * 最大帧 = 状态帧：6 字节帧头 + 69 地址 × 2 字节 = 144 字节
  */
-static uint8_t  tx_frame_buf[6 + 68 * 2];
+static uint8_t  tx_frame_buf[6 + 69 * 2];
 static uint16_t tx_frame_len;
 
 /* ==================== 全局报警标志 ====================
@@ -196,13 +196,15 @@ static void DWIN_BuildSensorFrame(uint8_t slave, uint8_t model)
 }
 
 /**
-  * @brief  构造状态帧（图标 + 全局报警 + 零地址 + 地址重复）
+  * @brief  构造状态帧（图标 + 全局报警 + 零地址 + 地址重复 + 烟雾报警）
   *
-  * 一次性写入 0x1400-0x1443（68 地址 = 136 字节数据）：
+  * 一次性写入 0x1400-0x1444（69 地址 = 138 字节数据）：
   *   0x1400-0x143F: 64 路传感器图标（uint16/路）
-  *   0x1440-0x1441: 全局报警标志（2 份相同值）
+  *   0x1440:        开窗图标（全局报警 OR 烟雾报警，与 WS 引脚一致）
+  *   0x1441:        全局报警图标（仅传感器报警）
   *   0x1442:        零地址存在
   *   0x1443:        地址重复
+  *   0x1444:        烟雾报警器图标
   */
 static void DWIN_BuildStatusFrame(void)
 {
@@ -211,14 +213,14 @@ static void DWIN_BuildStatusFrame(void)
     /* ---- 帧头 ---- */
     tx_frame_buf[idx++] = DWIN_HEADER_1;
     tx_frame_buf[idx++] = DWIN_HEADER_2;
-    tx_frame_buf[idx++] = 3 + 68 * 2;                   /* 3 + 136 = 139 */
+    tx_frame_buf[idx++] = 3 + 69 * 2;                   /* 3 + 138 = 141 */
     tx_frame_buf[idx++] = DWIN_CMD_WRITE_VAR;
     tx_frame_buf[idx++] = (uint8_t)(DWIN_ICON_BASE >> 8);
     tx_frame_buf[idx++] = (uint8_t)(DWIN_ICON_BASE & 0xFF);
 
-    /* ---- 数据区（68 × uint16 = 136 字节） ---- */
+    /* ---- 数据区（69 × uint16 = 138 字节） ---- */
     uint8_t *data = &tx_frame_buf[idx];
-    memset(data, 0, 68 * 2);
+    memset(data, 0, 69 * 2);
 
     dwin_global_alarm = 0;
 
@@ -264,7 +266,11 @@ static void DWIN_BuildStatusFrame(void)
     data[67 * 2 + 0] = 0;
     data[67 * 2 + 1] = ModbusReg_GetAddrConflict();
 
-    tx_frame_len = idx + 68 * 2;
+    /* 烟雾报警器 → 0x1444 */
+    data[68 * 2 + 0] = 0;
+    data[68 * 2 + 1] = ModbusReg_GetSmokeAlarm();
+
+    tx_frame_len = idx + 69 * 2;
 }
 
 /**
