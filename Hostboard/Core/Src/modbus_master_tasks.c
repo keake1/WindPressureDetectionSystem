@@ -122,8 +122,8 @@ void TaskModbusRecv(void *arg)
             uint8_t  func_code  = raw.frame[1];
             uint8_t  byte_cnt   = raw.frame[2];
 
-            /* 地址 0：记录零地址响应，不存入数组 */
-            if (slave_addr == 0)
+            /* 地址 0：仅 FC 0x02 响应视为有效的零地址检测 */
+            if (slave_addr == 0 && func_code == 0x02)
             {
                 HostReg_RecordZeroAddrResponse();
             }
