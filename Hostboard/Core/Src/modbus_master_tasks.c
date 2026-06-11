@@ -77,8 +77,9 @@ void TaskModbusSend(void *arg)
         tx_buf[6] = (uint8_t)(crc & 0xFF);
         tx_buf[7] = (uint8_t)(crc >> 8);
 
-        /* ---- 4. 发送 ---- */
-        HAL_UART_Transmit(&huart1, tx_buf, 8, HAL_MAX_DELAY);
+        /* ---- 4. 中断发送 ---- */
+        HAL_UART_Transmit_IT(&huart1, tx_buf, 8);
+        xSemaphoreTake(xMasterTxCompleteSem, pdMS_TO_TICKS(50));
 
         /* ---- 5. 等待响应 ---- */
         xSemaphoreTake(xMasterRxSem, MODBUS_RESP_TIMEOUT);
@@ -126,10 +127,10 @@ void TaskModbusRecv(void *arg)
             (void)byte_cnt;
 
             /* TODO: 根据应用需求解析数据并存入本地寄存器 */
-        }
 
-        /* ---- 3. 释放信号量：通知发送任务可以发下一帧 ---- */
-        xSemaphoreGive(xMasterRxSem);
+            /* ---- 3. 仅 CRC 通过时释放信号量：通知发送任务可以发下一帧 ---- */
+            xSemaphoreGive(xMasterRxSem);
+        }
     }
 }
 

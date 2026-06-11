@@ -75,8 +75,9 @@ typedef struct {
 
 /* Exported queue/semaphore handles -----------------------------------------*/
 
-extern QueueHandle_t      xMasterSendQueue;    /* 发送队列 */
-extern SemaphoreHandle_t  xMasterRxSem;        /* 接收完成信号量 */
+extern QueueHandle_t      xMasterSendQueue;        /* 发送队列 */
+extern SemaphoreHandle_t  xMasterRxSem;            /* 接收完成信号量 */
+extern SemaphoreHandle_t  xMasterTxCompleteSem;    /* USART1 TX 完成信号量 */
 
 /* Exported functions prototypes ---------------------------------------------*/
 

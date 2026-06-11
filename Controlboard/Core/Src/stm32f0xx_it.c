@@ -188,6 +188,7 @@ void USART1_IRQHandler(void)
   if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_ORE))
   {
       __HAL_UART_CLEAR_OREFLAG(&huart1);
+      ModbusMaster_ResetRx();
   }
 
   /* USER CODE END USART1_IRQn 0 */
@@ -224,6 +225,7 @@ void USART2_IRQHandler(void)
   if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_ORE))
   {
       __HAL_UART_CLEAR_OREFLAG(&huart2);
+      ModbusSlave_ResetRx();
   }
 
   /* USER CODE END USART2_IRQn 0 */

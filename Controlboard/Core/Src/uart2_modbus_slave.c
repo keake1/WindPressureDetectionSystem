@@ -26,6 +26,7 @@ static volatile uint16_t rx_index = 0;
 
 /* ========== 队列定义 ========== */
 QueueHandle_t xSlaveTxQueue = NULL;
+SemaphoreHandle_t xSlaveTxCompleteSem = NULL;
 
 /* 原始响应队列（ISR → 接收任务，不与主站共享） */
 static QueueHandle_t xSlaveRawRxQueue = NULL;
@@ -52,6 +53,9 @@ void ModbusSlave_InitQueues(void)
 
     if (xSlaveTxQueue == NULL)
         xSlaveTxQueue = xQueueCreate(MODBUS_SLAVE_TX_QUEUE_LEN, sizeof(ModbusSlaveFrame_t));
+
+    if (xSlaveTxCompleteSem == NULL)
+        xSlaveTxCompleteSem = xSemaphoreCreateBinary();
 }
 
 /* ==================== 中断接收启动 ==================== */
@@ -69,6 +73,15 @@ void ModbusSlave_StartRx(void)
 
     /* 使能 USART2 IDLE 中断 */
     SET_BIT(huart2.Instance->CR1, USART_CR1_IDLEIE);
+}
+
+/**
+  * @brief  重置接收缓冲区索引（ORE 溢出时调用）
+  * @note   在 ISR 的 ORE 处理中调用，丢弃可能已损坏的接收数据。
+  */
+void ModbusSlave_ResetRx(void)
+{
+    rx_index = 0;
 }
 
 /* ==================== 中断处理函数（ISR 中调用） ==================== */

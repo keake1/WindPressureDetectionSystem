@@ -61,12 +61,14 @@ typedef struct {
 
 /* Exported queue/semaphore handles -----------------------------------------*/
 
-extern QueueHandle_t      xSlaveTxQueue;     /* 发送队列（接收任务 → 发送任务） */
+extern QueueHandle_t      xSlaveTxQueue;         /* 发送队列（接收任务 → 发送任务） */
+extern SemaphoreHandle_t  xSlaveTxCompleteSem;    /* UART2 TX 完成信号量 */
 
 /* Exported functions prototypes ---------------------------------------------*/
 
 void     ModbusSlave_InitQueues(void);
 void     ModbusSlave_StartRx(void);
+void     ModbusSlave_ResetRx(void);
 void     ModbusSlave_RxByteHandler(uint8_t data);
 void     ModbusSlave_RxIdleHandler(void);
 int      ModbusSlave_DequeueRawFrame(ModbusSlaveFrame_t *raw, TickType_t timeout);

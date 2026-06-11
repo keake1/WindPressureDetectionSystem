@@ -34,6 +34,7 @@ static volatile uint16_t rx_index = 0;
 /* ========== 队列/信号量定义 ========== */
 QueueHandle_t      xModbusSendQueue     = NULL;
 SemaphoreHandle_t  xModbusTxSemaphore   = NULL;
+SemaphoreHandle_t  xModbusTxCompleteSem = NULL;
 
 /* 原始响应队列（内部使用，ISR→接收任务，不在 .h 中暴露） */
 static QueueHandle_t xModbusRawRxQueue = NULL;
@@ -97,6 +98,9 @@ void ModbusMaster_InitQueues(void)
 
     if (xModbusTxSemaphore == NULL)
         xModbusTxSemaphore = xSemaphoreCreateBinary();
+
+    if (xModbusTxCompleteSem == NULL)
+        xModbusTxCompleteSem = xSemaphoreCreateBinary();
 }
 
 /* ==================== 中断接收启动 ==================== */
@@ -115,6 +119,15 @@ void ModbusMaster_StartRx(void)
 
     /* 使能 USART1 IDLE 中断 — 总线空闲（一帧结束）触发 */
     SET_BIT(huart1.Instance->CR1, USART_CR1_IDLEIE);
+}
+
+/**
+  * @brief  重置接收缓冲区索引（ORE 溢出时调用）
+  * @note   在 ISR 的 ORE 处理中调用，丢弃可能已损坏的接收数据。
+  */
+void ModbusMaster_ResetRx(void)
+{
+    rx_index = 0;
 }
 
 /* ==================== 中断处理函数（ISR 中调用） ==================== */

@@ -31,6 +31,7 @@ static volatile uint16_t rx_index = 0;
 /* ========== 队列/信号量定义 ========== */
 QueueHandle_t      xMasterSendQueue    = NULL;
 SemaphoreHandle_t  xMasterRxSem        = NULL;
+SemaphoreHandle_t  xMasterTxCompleteSem = NULL;
 
 /* 原始响应队列（ISR → 接收任务） */
 static QueueHandle_t xMasterRawRxQueue = NULL;
@@ -90,6 +91,9 @@ void ModbusMaster_InitQueues(void)
 
     if (xMasterRxSem == NULL)
         xMasterRxSem = xSemaphoreCreateBinary();
+
+    if (xMasterTxCompleteSem == NULL)
+        xMasterTxCompleteSem = xSemaphoreCreateBinary();
 }
 
 /* ==================== 中断接收控制 ==================== */

@@ -87,8 +87,9 @@ void TaskModbusSend(void *arg)
         tx_buf[6] = (uint8_t)(crc & 0xFF);
         tx_buf[7] = (uint8_t)(crc >> 8);
 
-        /* ---- 3. 发送（RS485 硬件自动切方向） ---- */
-        HAL_UART_Transmit(&huart1, tx_buf, 8, HAL_MAX_DELAY);
+        /* ---- 3. 中断发送（不阻塞任务） ---- */
+        HAL_UART_Transmit_IT(&huart1, tx_buf, 8);
+        xSemaphoreTake(xModbusTxCompleteSem, pdMS_TO_TICKS(50));
 
         /* ---- 4. 读指令等待响应，写指令跳过 ---- */
         if (req.func_code == MODBUS_FUNC_READ_HOLDING_REGISTERS)
@@ -234,8 +235,11 @@ void TaskModbusReceive(void *arg)
             ModbusReg_RecordCrcError();
         }
 
-        /* ---- 9. 释放信号量：无论 CRC 通过与否，都通知发送任务 ---- */
-        xSemaphoreGive(xModbusTxSemaphore);
+        /* ---- 9. 仅 CRC 通过时释放信号量，通知发送任务收到响应 ---- */
+        if (crc_ok)
+        {
+            xSemaphoreGive(xModbusTxSemaphore);
+        }
 
         /* 调试：记录收到并处理完一帧的时间 */
         poll_debug_rx_tick = xTaskGetTickCount();

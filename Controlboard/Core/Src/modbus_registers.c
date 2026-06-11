@@ -10,6 +10,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "modbus_registers.h"
 #include <string.h>
+#include "FreeRTOS.h"
+#include "task.h"
 
 /* USER CODE BEGIN 0 */
 
@@ -83,31 +85,43 @@ static inline uint8_t addr_valid(uint8_t slave)
 void ModbusReg_SetOnline(uint8_t slave, uint8_t online)
 {
     if (!addr_valid(slave)) return;
+    taskENTER_CRITICAL();
     if (online)
         coil_online |=  (1ULL << (slave - 1));
     else
         coil_online &= ~(1ULL << (slave - 1));
+    taskEXIT_CRITICAL();
 }
 
 uint8_t ModbusReg_GetOnline(uint8_t slave)
 {
     if (!addr_valid(slave)) return 0;
-    return (coil_online >> (slave - 1)) & 1;
+    uint8_t bit;
+    taskENTER_CRITICAL();
+    bit = (coil_online >> (slave - 1)) & 1;
+    taskEXIT_CRITICAL();
+    return bit;
 }
 
 void ModbusReg_SetAlarm(uint8_t slave, uint8_t alarm)
 {
     if (!addr_valid(slave)) return;
+    taskENTER_CRITICAL();
     if (alarm)
         coil_alarm |=  (1ULL << (slave - 1));
     else
         coil_alarm &= ~(1ULL << (slave - 1));
+    taskEXIT_CRITICAL();
 }
 
 uint8_t ModbusReg_GetAlarm(uint8_t slave)
 {
     if (!addr_valid(slave)) return 0;
-    return (coil_alarm >> (slave - 1)) & 1;
+    uint8_t bit;
+    taskENTER_CRITICAL();
+    bit = (coil_alarm >> (slave - 1)) & 1;
+    taskEXIT_CRITICAL();
+    return bit;
 }
 
 /* ==================== 保持寄存器操作 ==================== */

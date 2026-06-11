@@ -56,8 +56,12 @@ void TaskSlaveRecv(void *arg)
 {
     (void)arg;
     ModbusSlaveFrame_t raw;
-    uint8_t  resp_buf[128];
+    uint8_t  resp_buf[256];
     uint16_t crc;
+
+    /* 根据寄存器表限制最大读取范围 */
+#define MAX_COIL_BITS       (COIL_SMOKE_ALARM + 1)   /* 130: 线圈最大地址+1 */
+#define MAX_HOLDING_REGS    125                       /* 3+125*2+2=255 = 256 */
 
     for (;;)
     {
@@ -93,8 +97,8 @@ void TaskSlaveRecv(void *arg)
                 uint16_t start_addr = ((uint16_t)raw.frame[2] << 8) | raw.frame[3];
                 uint16_t bit_count  = ((uint16_t)raw.frame[4] << 8) | raw.frame[5];
 
-                /* 限制最大位数避免缓冲区溢出 */
-                if (bit_count > 2000) bit_count = 2000;
+                /* 限制最大位数：不超过线圈寄存器范围 */
+                if (bit_count > MAX_COIL_BITS) bit_count = MAX_COIL_BITS;
 
                 uint16_t byte_count = (bit_count + 7) / 8;
 
@@ -123,7 +127,7 @@ void TaskSlaveRecv(void *arg)
                 uint16_t reg_count  = ((uint16_t)raw.frame[4] << 8) | raw.frame[5];
 
                 /* 限制最大寄存器数避免缓冲区溢出 */
-                if (reg_count > 62) reg_count = 62;
+                if (reg_count > MAX_HOLDING_REGS) reg_count = MAX_HOLDING_REGS;
 
                 resp_buf[0] = (uint8_t)own_addr;
                 resp_buf[1] = 0x03;
@@ -175,8 +179,9 @@ void TaskSlaveSend(void *arg)
         if (xQueueReceive(xSlaveTxQueue, &resp, portMAX_DELAY) != pdPASS)
             continue;
 
-        /* ---- 2. 发送 ---- */
-        HAL_UART_Transmit(&huart2, resp.frame, resp.length, HAL_MAX_DELAY);
+        /* ---- 2. 中断发送 ---- */
+        HAL_UART_Transmit_IT(&huart2, resp.frame, resp.length);
+        xSemaphoreTake(xSlaveTxCompleteSem, pdMS_TO_TICKS(200));
 
         /* ---- 3. 3.5 字符帧间隔 ---- */
         vTaskDelay(SLAVE_3_5_CHAR_TICKS);

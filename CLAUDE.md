@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-风压检测系统：一个 Modbus RTU 主-从架构的嵌入式系统。包含两个 STM32 控制器（Controlboard + Hostboard）通过 RS485 互联，以及多个传感器从机和一块迪文屏用于本地显示。
+风压检测系统：一个 Modbus RTU 主-从架构的嵌入式系统。包含两个 STM32 控制器（Controlboard + Hostboard）通过 PowerBus 二总线互联，以及多个传感器从机和一块迪文屏用于本地显示。
 
 ### Repository Structure
 
@@ -29,7 +29,7 @@ WindPressureDetectionSystem/
 │   │   └── stm32cubemx/CMakeLists.txt
 │   ├── startup_stm32f070xb.s
 │   └── STM32F070XX_FLASH.ld
-├── Hostboard/           # 上位机/中继板 (STM32F407VET6 + FreeRTOS) — 通过 RS485 与 Controlboard 通信
+├── Hostboard/           # 上位机/中继板 (STM32F407VET6 + FreeRTOS) — 通过 PowerBus 二总线与 Controlboard 通信
 │   ├── CMakeLists.txt   # CMake + Ninja 构建
 │   ├── CMakePresets.json
 │   ├── Core/
@@ -72,8 +72,8 @@ WindPressureDetectionSystem/
 
 | 外设 | 用途 | 参数 |
 |------|------|------|
-| USART1 | Modbus RTU 主站 — 传感器总线 (RS485) | 9600 8N1, TX=PA9, RX=PA10, DE/RE=PA8 |
-| USART2 | Modbus RTU 从站 — Hostboard 互联 (RS485) | 9600 8N1, TX=PA2, RX=PA3, DE/RE=PA1 |
+| USART1 | Modbus RTU 主站 — 传感器总线 (PowerBus 二总线) | 9600 8N1, TX=PA9, RX=PA10 |
+| USART2 | Modbus RTU 从站 — Hostboard 互联 (PowerBus 二总线) | 9600 8N1, TX=PA2, RX=PA3 |
 | UART4 | 迪文屏 (DWIN) 串口 | 115200 8N1, TX=PC10, RX=PC11 |
 | I2C1 | 烟雾报警器 IO 扩展 (PCF8574) | SCL=PB6, SDA=PB7 |
 | GPIO — LED | GREEN_LED=PB13, ORANGE_LED=PB8, RED_LED=PB9 | 低电平点亮 |
@@ -103,11 +103,11 @@ Controlboard 是下位机控制器（STM32F070xB, 48MHz），同时承担两个 
 
 | 任务 | 函数 | 优先级 | 栈(words) | 职责 |
 |------|------|--------|-----------|------|
-| ModbusSend | `TaskModbusSend` | 2 | 128 | 从队列取请求，构造 Modbus 帧发送，等响应信号量，3.5 字符间隔 |
+| ModbusSend | `TaskModbusSend` | 2 | 128 | 从队列取请求，构造 Modbus 帧，中断发送 + 等 TX 完成信号量，读指令等响应信号量，3.5 字符间隔 |
 | ModbusRecv | `TaskModbusReceive` | 2 | 128 | 等待 IDLE 中断填的原始帧队列，CRC 校验，解析数据存入寄存器，报警判定，DWIN 更新，释放信号量 |
 | ModbusPoll | `TaskModbusPoll` | 2 | 128 | 每 50ms 轮询一个地址（0-63 顺序 + 每 8 次插 1 次在线），每轮回绕读 DIP+StepCycle，翻转 GREEN_LED |
 | SlaveRecv | `TaskSlaveRecv` | 2 | 128 | UART2 从站接收：等待原始帧，CRC 校验，解析 FC 0x02/0x03，读寄存器构造响应，入队发送队列 |
-| SlaveSend | `TaskSlaveSend` | 2 | 128 | UART2 从站发送：从发送队列取响应帧，UART2 发送，3.5 字符间隔 |
+| SlaveSend | `TaskSlaveSend` | 2 | 128 | UART2 从站发送：从发送队列取响应帧，中断发送 + 等 TX 完成信号量，3.5 字符间隔 |
 | DwinIcons | `TaskDwinIcons` | 1 | 128 | **每 500ms**：读取 Isolator 引脚→更新烟雾报警线圈位；入队状态帧+地址帧；控制 WS/ORANGE_LED/RED_LED |
 | IDLE | `Idle` | 0 | - | FreeRTOS 空闲任务 |
 
@@ -120,9 +120,9 @@ Controlboard 是下位机控制器（STM32F070xB, 48MHz），同时承担两个 
   │  每 10 次: Toggle GREEN_LED
   │  每轮: DWIN_FlushQueue() 排空迪文屏更新队列
 
-  [传感器总线 (RS485) — Modbus 主站]
+  [传感器总线 (PowerBus 二总线) — Modbus 主站]
   │
-  ├──→ [xModbusSendQueue(8)] ──→ 发送任务(TaskModbusSend) ──UART1 TX──→ RS485
+  ├──→ [xModbusSendQueue(8)] ──→ 发送任务(TaskModbusSend) ──UART1 TX──→ PowerBus 总线
   │                                    │
   │                              xSemaphoreTake(30ms 超时)
   │                                    │
@@ -135,7 +135,7 @@ Controlboard 是下位机控制器（STM32F070xB, 48MHz），同时承担两个 
   ├── 线圈寄存器 ←── 在线/报警位 ─────────────────────────────────────────────┤
   ├── 保持寄存器 ←── 类型+数据 ──────────────────────────────────────────────┤
 
-  [Hostboard 互联 (RS485) — Modbus 从站]
+  [Hostboard 互联 (PowerBus 二总线) — Modbus 从站]
   │
   ├── UART2 ISR (RXNE+IDLE+ORE) → [xSlaveRawRxQueue(4)]
   │                                            │
@@ -147,7 +147,7 @@ Controlboard 是下位机控制器（STM32F070xB, 48MHz），同时承担两个 
   │                                            │
   │                              从站发送任务(TaskSlaveSend)
   │                                ├─ HAL_UART_Transmit
-  │                                └─ vTaskDelay(4ms) → UART2 TX → RS485
+  │                                └─ vTaskDelay(4ms) → UART2 TX → PowerBus 总线
 
   [迪文屏状态任务]
   │
@@ -193,21 +193,22 @@ Controlboard 是下位机控制器（STM32F070xB, 48MHz），同时承担两个 
 
 ## Hostboard 架构
 
-Hostboard（STM32F407VET6, 168MHz）是上位机/中继板，通过 RS485 与 Controlboard 通信，读取 Controlboard 的传感器数据。
+Hostboard（STM32F407VET6, 168MHz）是上位机/中继板，通过 PowerBus 二总线与 Controlboard 通信，读取 Controlboard 的传感器数据。
 
 ### 模块文件
 
 | 文件 | 职责 |
 |------|------|
-| `uart1_modbus_master.c/h` | Modbus RTU 主站驱动：ISR 接收（RXNE+IDLE+ORE）、发送队列、CRC 计算 |
-| `modbus_master_tasks.c/h` | FreeRTOS 任务层：发送任务（帧发送 + 3.5字符间隔 + 开/关接收窗口）、接收任务（CRC 校验 + 释放信号量） |
+| `uart1_modbus_master.c/h` | Modbus RTU 主站驱动：ISR 接收（RXNE+IDLE+ORE）、发送队列、TX 完成信号量、CRC 计算 |
+| `modbus_master_tasks.c/h` | FreeRTOS 任务层：发送任务（中断发送 + 等 TX 完成信号量 + 开/关接收窗口）、接收任务（CRC 校验 + 释放信号量） |
 | `modbus_polling.c/h` | FreeRTOS 轮询任务：每秒轮询 Controlboard（读离散输入 + 读保持寄存器） |
+| `modbus_callbacks.c` | HAL UART TX 完成回调（释放 `xMasterTxCompleteSem`） |
 
 ### 任务架构（共 4 个 FreeRTOS 任务）
 
 | 任务 | 函数 | 优先级 | 栈(words) | 职责 |
 |------|------|--------|-----------|------|
-| MstSend | `TaskModbusSend` | 2 | 128 | 从队列取请求，构造 Modbus 帧发送，等响应信号量，关接收窗口，3.5 字符间隔 |
+| MstSend | `TaskModbusSend` | 2 | 128 | 从队列取请求，构造 Modbus 帧，中断发送 + 等 TX 完成信号量，开/关接收窗口，等响应信号量，3.5 字符间隔 |
 | MstRecv | `TaskModbusReceive` | 2 | 128 | 等待 IDLE 中断填的原始帧队列，CRC 校验，释放信号量 |
 | MstPoll | `TaskModbusPoll` | 1 | 128 | 每 1000ms 轮询 Controlboard（读离散输入 + 读保持寄存器） |
 | IDLE | `Idle` | 0 | - | FreeRTOS 空闲任务 |
@@ -216,17 +217,19 @@ Hostboard（STM32F407VET6, 168MHz）是上位机/中继板，通过 RS485 与 Co
 
 | 引脚 | 方向 | 用途 |
 |------|------|------|
-| PA9 (USART1_TX) | 输出 | RS485 发送 → Controlboard UART2 RX |
-| PA10 (USART1_RX) | 输入 | RS485 接收 ← Controlboard UART2 TX |
+| PA9 (USART1_TX) | 输出 | PowerBus 二总线发送 → Controlboard UART2 RX |
+| PA10 (USART1_RX) | 输入 | PowerBus 二总线接收 ← Controlboard UART2 TX |
 
 ISR 处理与 Controlboard UART1 架构相同：RXNE 逐字节接收 → IDLE 入原始帧队列 → ORE 写 ICR 清除。
+
+> **注意**：PowerBus 二总线收发器内置方向控制，无需软件切换 DE/RE 引脚。
 
 ## 板间通信架构（Hostboard ↔ Controlboard）
 
 ### 物理层
 
 ```
-Hostboard                    RS485 总线                Controlboard
+Hostboard                    PowerBus 二总线            Controlboard
 USART1 (PA9/PA10)  ─── 9600 8N1 ───  UART2 (PA2/PA3)
     主站 (Master)                              从站 (Slave)
 ```
@@ -242,18 +245,19 @@ USART1 (PA9/PA10)  ─── 9600 8N1 ───  UART2 (PA2/PA3)
   │ TaskModbusPoll      │                     │ USART2 ISR               │
   │  └─ EnqueueRequest() │                     │  ├─ RXNE → 逐字节存      │
   │    [xMasterSendQueue]│                     │  ├─ IDLE → 入原始队列     │
-  │      ↓               │    RS485 帧         │  └─ ORE  → 写 ICR 清除   │
+  │      ↓               │    PowerBus 总线帧   │  └─ ORE  → 写 ICR 清除   │
   │ TaskModbusSend      │ ─────────────────→ │    [xSlaveRawRxQueue]    │
   │  ├─ StartRx() 开窗   │                     │        ↓                 │
-  │  ├─ HAL_UART_Transmit│                     │  TaskSlaveRecv           │
-  │  ├─ xSemaphoreTake() │                     │   ├─ CRC 校验            │
-  │  └─ DisableRx() 关窗 │                     │   ├─ 解析 FC 0x02/0x03   │
-  │                      │                     │   ├─ ModbusReg_Read*()   │
-  │ TaskModbusRecv      │ ←────────────────── │   └─ xQueueSend(TxQueue)  │
-  │  ├─ CRC 校验         │    RS485 响应       │        ↓                 │
-  │  └─ xSemaphoreGive() │                     │  TaskSlaveSend           │
-  │                      │                     │   ├─ HAL_UART_Transmit   │
-  └─────────────────────┘                     │   └─ vTaskDelay(4ms)      │
+  │  ├─ Transmit_IT      │                     │  TaskSlaveRecv           │
+  │  ├─ TX 完成信号量     │                     │   ├─ CRC 校验            │
+  │  ├─ 等响应信号量      │                     │   ├─ 解析 FC 0x02/0x03   │
+  │  └─ DisableRx() 关窗 │                     │   ├─ ModbusReg_Read*()   │
+  │                      │                     │   └─ xQueueSend(TxQueue)  │
+  │ TaskModbusRecv      │ ←────────────────── │        ↓                 │
+  │  ├─ CRC 校验         │    PowerBus 总线响应 │  TaskSlaveSend           │
+  │  └─ xSemaphoreGive() │                     │   ├─ Transmit_IT         │
+  └─────────────────────┘                     │   ├─ TX 完成信号量        │
+                                              │   └─ vTaskDelay(4ms)      │
                                               └──────────────────────────┘
 ```
 
@@ -407,7 +411,7 @@ HAL_UART_TxCpltCallback (ISR)
 
 ## Modbus 通信协议
 
-所有传感器使用 RS485 + Modbus RTU，**9600 baud，8N1**。
+所有传感器使用 PowerBus 二总线 + Modbus RTU，**9600 baud，8N1**。
 
 ### 型号字节
 
@@ -576,6 +580,8 @@ arm-none-eabi-gdb build/Debug/Controlboard.elf
 | Hostboard 轮询间隔 | 1000ms | TaskModbusPoll 定时读取 Controlboard |
 | UART2 从站响应 | 由 Hostboard 请求触发 | TaskSlaveRecv 解析 → TaskSlaveSend 回复 |
 | UART2 从站过滤 | 仅响应本机 DIP 地址 | `slave_addr == ModbusReg_GetBoardAddr()` |
+| USART1 TX 完成超时 | 50ms | 中断发送等 TX 完成信号量 |
+| UART2 TX 完成超时 | 200ms | 从站发送等 TX 完成信号量（大帧 130 字节 @ 9600 ≈ 135ms） |
 
 ## 风压传感器固件架构
 
@@ -674,7 +680,7 @@ FreeRTOS 的 `port.c`（`Drivers/Middlewares/FreeRTOS/portable/GCC/ARM_CM0/port.
 
 ### USART1 中断风暴：ORE + IDLE 标志清除方式
 
-**症状**：RS485 总线空闲时，CPU 卡死在 `USART1_IRQHandler` → `HAL_UART_IRQHandler` 中，FreeRTOS 任务无法运行，GREEN_LED 不闪烁。
+**症状**：PowerBus 二总线空闲时，CPU 卡死在 `USART1_IRQHandler` → `HAL_UART_IRQHandler` 中，FreeRTOS 任务无法运行，GREEN_LED 不闪烁。
 
 **根因**（两个问题叠加）：
 
@@ -710,3 +716,33 @@ if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_ORE))
 2. **调度器未启动保护**：`HAL_Init()` 在 `main()` 一开始就启动了 SysTick（1kHz），而 FreeRTOS 内核此时尚未初始化（`pxDelayedTaskList` 等链表为 NULL）。在调度器启动前调用 `xTaskIncrementTick()` 会解引用空链表导致 HardFault。添加了 `xTaskGetSchedulerState()` 检查，调度器未启动时仅维护 HAL 时基后直接返回。
 
 **注意**：CubeMX 不会覆盖 Middlewares 目录下的文件，因此此修改在 CubeMX 重新生成后仍然保留。
+
+### 接收任务信号量管理
+
+接收任务（`TaskModbusReceive` / `TaskModbusRecv`）**仅在 CRC 校验通过时**调用 `xSemaphoreGive()` 释放响应信号量。CRC 失败时不释放，发送任务超时后自动进入下一轮请求。这防止了总线噪声触发假 IDLE 导致信号量被非法置位。
+
+受影响文件（两侧）：
+- `Controlboard/Core/Src/modbus_tasks.c` — `TaskModbusReceive`
+- `Hostboard/Core/Src/modbus_master_tasks.c` — `TaskModbusRecv`
+
+### 中断发送架构（TX 完成信号量）
+
+两侧的 USART1 和 Controlboard 的 UART2 均使用 **`HAL_UART_Transmit_IT` + TX 完成信号量** 替代阻塞轮询发送。任务在等待 TX 完成时可以被高优先级任务抢占，减少系统延迟。
+
+| UART | TX 完成信号量 | 超时 | 回调位置 |
+|------|-------------|------|---------|
+| Controlboard USART1 (master) | `xModbusTxCompleteSem` | 50ms | `dwin.c` → `HAL_UART_TxCpltCallback` |
+| Controlboard UART2 (slave) | `xSlaveTxCompleteSem` | 200ms | `dwin.c` → `HAL_UART_TxCpltCallback` |
+| Hostboard USART1 (master) | `xMasterTxCompleteSem` | 50ms | `modbus_callbacks.c` → `HAL_UART_TxCpltCallback` |
+
+### 64 位线圈寄存器跨任务保护
+
+`coil_online` 和 `coil_alarm` 是 `uint64_t` 变量，在 Cortex-M0 上读写需要多条指令。`ModbusReg_SetOnline`/`GetOnline`/`SetAlarm`/`GetAlarm` 四个函数使用 `taskENTER_CRITICAL`/`taskEXIT_CRITICAL` 保护，防止 `TaskDwinIcons`（优先级 1）读时被 `TaskModbusReceive`（优先级 2）写导致读撕裂。
+
+### DWIN 环形缓冲区竞态保护
+
+`DWIN_Enqueue` 和 `DWIN_Dequeue` 使用 `taskENTER_CRITICAL`/`taskEXIT_CRITICAL` 保护队列指针操作。`DWIN_Enqueue` 被 `TaskModbusReceive`（优先级 2）和 `TaskDwinIcons`（优先级 1）同时调用，无保护会导致指针写入丢失。
+
+### ORE 中断重置 rx_index
+
+USART1 和 USART2 的 ORE（溢出错误）中断处理中增加了 `ModbusMaster_ResetRx()` / `ModbusSlave_ResetRx()` 调用，将接收缓冲区索引 `rx_index` 清零。防止 ORE 导致字节丢失后，后续字节与旧帧残余拼接成错误帧。受影响的 ISR：`stm32f0xx_it.c` → `USART1_IRQHandler`、`USART2_IRQHandler`。

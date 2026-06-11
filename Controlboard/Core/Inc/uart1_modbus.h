@@ -93,11 +93,13 @@ typedef struct {
 
 extern QueueHandle_t      xModbusSendQueue;     /* 发送队列 */
 extern SemaphoreHandle_t  xModbusTxSemaphore;   /* 事务完成信号量 */
+extern SemaphoreHandle_t  xModbusTxCompleteSem; /* USART1 TX 完成信号量 */
 
 /* Exported functions prototypes ---------------------------------------------*/
 
 void     ModbusMaster_InitQueues(void);
 void     ModbusMaster_StartRx(void);
+void     ModbusMaster_ResetRx(void);
 int      ModbusMaster_EnqueueRequest(const ModbusRequest_t *req);
 void     ModbusMaster_RxByteHandler(uint8_t data);
 void     ModbusMaster_RxIdleHandler(void);

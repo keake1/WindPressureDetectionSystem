@@ -20,6 +20,7 @@
 #include "dwin.h"
 #include "usart.h"
 #include "uart1_modbus.h"
+#include "uart2_modbus_slave.h"
 #include "modbus_registers.h"
 #include "gpio.h"
 #include "FreeRTOS.h"
@@ -61,21 +62,31 @@ static uint8_t DWIN_QueueFull(void)
 
 static void DWIN_Enqueue(uint8_t type, uint8_t slave, uint8_t model)
 {
+    taskENTER_CRITICAL();
     if (DWIN_QueueFull())
+    {
+        taskEXIT_CRITICAL();
         return;          /* 队列满 → 丢弃 */
+    }
     dwin_queue[dwin_q_wr].type  = type;
     dwin_queue[dwin_q_wr].slave = slave;
     dwin_queue[dwin_q_wr].model = model;
     dwin_q_wr = (dwin_q_wr + 1) % DWIN_QUEUE_SIZE;
+    taskEXIT_CRITICAL();
 }
 
 static uint8_t DWIN_Dequeue(DWIN_QueueItem_t *item)
 {
-    if (DWIN_QueueEmpty())
-        return 0;
-    *item = dwin_queue[dwin_q_rd];
-    dwin_q_rd = (dwin_q_rd + 1) % DWIN_QUEUE_SIZE;
-    return 1;
+    uint8_t ret = 0;
+    taskENTER_CRITICAL();
+    if (!DWIN_QueueEmpty())
+    {
+        *item = dwin_queue[dwin_q_rd];
+        dwin_q_rd = (dwin_q_rd + 1) % DWIN_QUEUE_SIZE;
+        ret = 1;
+    }
+    taskEXIT_CRITICAL();
+    return ret;
 }
 
 /* ==================== 辅助函数 ==================== */
@@ -423,7 +434,21 @@ void TaskDwinIcons(void *arg)
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart == &huart3)
+    {
         dwin_tx_busy = 0;
+    }
+    else if (huart == &huart1)
+    {
+        BaseType_t xWoken = pdFALSE;
+        xSemaphoreGiveFromISR(xModbusTxCompleteSem, &xWoken);
+        portYIELD_FROM_ISR(xWoken);
+    }
+    else if (huart == &huart2)
+    {
+        BaseType_t xWoken = pdFALSE;
+        xSemaphoreGiveFromISR(xSlaveTxCompleteSem, &xWoken);
+        portYIELD_FROM_ISR(xWoken);
+    }
 }
 
 /* USER CODE END 0 */
