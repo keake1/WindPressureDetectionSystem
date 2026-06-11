@@ -24,6 +24,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "modbus_master_tasks.h"
 #include "uart1_modbus_master.h"
+#include "hostboard_registers.h"
 #include "usart.h"
 
 /* USER CODE BEGIN 0 */
@@ -117,19 +118,34 @@ void TaskModbusRecv(void *arg)
 
         if (crc_ok)
         {
-            uint8_t slave     = raw.frame[0];
-            uint8_t func_code = raw.frame[1];
-            uint8_t byte_cnt  = raw.frame[2];
+            uint8_t  slave_addr = raw.frame[0];
+            uint8_t  func_code  = raw.frame[1];
+            uint8_t  byte_cnt   = raw.frame[2];
 
-            /* 验证：从机地址和功能码应在合理范围 */
-            (void)slave;
-            (void)func_code;
-            (void)byte_cnt;
-
-            /* TODO: 根据应用需求解析数据并存入本地寄存器 */
+            /* 地址 0：记录零地址响应，不存入数组 */
+            if (slave_addr == 0)
+            {
+                HostReg_RecordZeroAddrResponse();
+            }
+            /* 地址 1-128：验证是 FC 0x02 响应且数据长度合理后存入寄存器 */
+            else if (slave_addr >= 1 && slave_addr <= MAX_CTRLBD_ADDR
+                     && func_code == 0x02
+                     && byte_cnt > 0
+                     && byte_cnt <= COIL_BYTE_COUNT
+                     && (3 + byte_cnt + 2) <= raw.length)
+            {
+                HostReg_StoreCoilData(slave_addr, &raw.frame[3], byte_cnt);
+            }
+            /* else: 功能码异常或格式错误 → 忽略不计 */
 
             /* ---- 3. 仅 CRC 通过时释放信号量：通知发送任务可以发下一帧 ---- */
             xSemaphoreGive(xMasterRxSem);
+        }
+        else
+        {
+            /* CRC 失败且收到过数据 → 计入重复地址检测 */
+            if (raw.length > 0)
+                HostReg_RecordError();
         }
     }
 }
