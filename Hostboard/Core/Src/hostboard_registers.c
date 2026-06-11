@@ -44,15 +44,15 @@ static uint8_t  addr_conflict_flag;              /* 综合结果 */
 
 /* ==================== 轮次跟踪 ==================== */
 
-static uint8_t  current_cycle;                   /* 0, 1, 2 循环 */
+static uint32_t current_cycle;                   /* 递增周期计数器，用于在线检测 */
 
 /* ==================== 线圈数据存储 ==================== */
 
 /**
- * board_coil_data[0] 预留（地址 0 有效响应不计入存储）
- * board_coil_data[1..128] 对应 Controlboard 地址 1-128
+ * ctrl_boards[0] 预留（地址 0 有效响应不计入存储）
+ * ctrl_boards[1..128] 对应 Controlboard 地址 1-128
  */
-static uint8_t  board_coil_data[MAX_CTRLBD_ADDR + 1][COIL_BYTE_COUNT];
+static CtrlBoardEntry_t ctrl_boards[MAX_CTRLBD_ADDR + 1];
 
 /* USER CODE END 0 */
 
@@ -77,7 +77,11 @@ void HostReg_StoreCoilData(uint8_t addr, const uint8_t *data, uint8_t len)
         return;
     if (len > COIL_BYTE_COUNT)
         len = COIL_BYTE_COUNT;
-    memcpy(board_coil_data[addr], data, len);
+    memcpy(ctrl_boards[addr].coil_data, data, len);
+
+    /* 收到有效响应 → 更新在线标志和周期 */
+    ctrl_boards[addr].online = 1;
+    ctrl_boards[addr].last_seen_cycle = current_cycle;
 }
 
 /**
@@ -92,7 +96,7 @@ uint8_t HostReg_GetCoilByte(uint8_t addr, uint8_t byte_idx)
         return 0;
     if (byte_idx >= COIL_BYTE_COUNT)
         return 0;
-    return board_coil_data[addr][byte_idx];
+    return ctrl_boards[addr].coil_data[byte_idx];
 }
 
 /**
@@ -107,7 +111,7 @@ uint8_t HostReg_GetCoilBit(uint8_t addr, uint16_t bit_idx)
         return 0;
     if (bit_idx >= COIL_BYTE_COUNT * 8)
         return 0;
-    return (board_coil_data[addr][bit_idx / 8] >> (bit_idx % 8)) & 1;
+    return (ctrl_boards[addr].coil_data[bit_idx / 8] >> (bit_idx % 8)) & 1;
 }
 
 /* ==================== 零地址检测 API ==================== */
@@ -148,6 +152,20 @@ uint8_t HostReg_GetAddrConflict(void)
     return addr_conflict_flag;
 }
 
+/* ==================== 在线检测 API ==================== */
+
+/**
+ * @brief  查询 Controlboard 在线状态
+ * @param  addr  Controlboard 地址 (1-128)
+ * @retval 1 在线，0 离线或地址越界
+ */
+uint8_t HostReg_IsOnline(uint8_t addr)
+{
+    if (addr < 1 || addr > MAX_CTRLBD_ADDR)
+        return 0;
+    return ctrl_boards[addr].online;
+}
+
 /* ==================== 周期更新 ==================== */
 
 /**
@@ -160,21 +178,30 @@ uint8_t HostReg_GetAddrConflict(void)
  */
 void HostReg_StepCycle(void)
 {
-    /* 重复地址检测：三轮错误计数累加 > 2 */
-    crc_error_history[current_cycle] = crc_error_count;
+    current_cycle++;
+
+    /* ---- 在线检测：检查所有 Controlboard (1-128) ---- */
+    for (uint16_t addr = 1; addr <= MAX_CTRLBD_ADDR; addr++)
+    {
+        if (ctrl_boards[addr].last_seen_cycle + 3 <= current_cycle)
+        {
+            ctrl_boards[addr].online = 0;  /* 连续三轮无响应 → 离线 */
+        }
+    }
+
+    /* ---- 重复地址检测：三轮错误计数累加 > 2 ---- */
+    crc_error_history[(current_cycle - 1) % 3] = crc_error_count;
     crc_error_count = 0;
 
     uint32_t sum = crc_error_history[0] + crc_error_history[1] + crc_error_history[2];
     addr_conflict_flag = (sum > 2) ? 1 : 0;
 
-    /* 零地址检测：三轮 OR */
-    zero_addr_history[current_cycle] = zero_addr_found_this_cycle;
+    /* ---- 零地址检测：三轮 OR ---- */
+    zero_addr_history[(current_cycle - 1) % 3] = zero_addr_found_this_cycle;
     zero_addr_found_this_cycle = 0;
     zero_addr_present = zero_addr_history[0]
                      || zero_addr_history[1]
                      || zero_addr_history[2];
-
-    current_cycle = (current_cycle + 1) % 3;
 }
 
 /* USER CODE END 1 */

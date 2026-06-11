@@ -24,6 +24,24 @@ extern "C" {
 
 /* USER CODE END Includes */
 
+/* Exported types ------------------------------------------------------------*/
+
+/* USER CODE BEGIN ET */
+
+/**
+ * @brief  Controlboard 信息结构体
+ *
+ * 每个地址 (1-128) 对应一个结构体实例，合并存储线圈数据、
+ * 在线标志和离线检测追踪信息。
+ */
+typedef struct {
+    uint8_t  coil_data[17];               /* 17 字节原始线圈数据 (COIL_BYTE_COUNT) */
+    uint32_t last_seen_cycle;              /* 最近收到正确响应时的周期号 */
+    uint8_t  online;                       /* 1=在线, 0=离线 */
+} CtrlBoardEntry_t;
+
+/* USER CODE END ET */
+
 /* Exported constants --------------------------------------------------------*/
 
 /** @defgroup HostReg_Constants 地址范围和线圈布局 */
@@ -64,6 +82,11 @@ uint8_t HostReg_GetZeroAddrPresent(void);
 void    HostReg_RecordError(void);
 void    HostReg_StepCycle(void);
 uint8_t HostReg_GetAddrConflict(void);
+/** @} */
+
+/** @defgroup HostReg_Online 在线检测 */
+/** @{ */
+uint8_t HostReg_IsOnline(uint8_t addr);
 /** @} */
 
 /* USER CODE BEGIN EFP */

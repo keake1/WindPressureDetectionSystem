@@ -200,8 +200,9 @@ Hostboard（STM32F407VET6, 168MHz）是上位机/中继板，通过 PowerBus 二
 | 文件 | 职责 |
 |------|------|
 | `uart1_modbus_master.c/h` | Modbus RTU 主站驱动：ISR 接收（RXNE+IDLE+ORE）、发送队列、TX 完成信号量、CRC 计算 |
-| `modbus_master_tasks.c/h` | FreeRTOS 任务层：发送任务（中断发送 + 等 TX 完成信号量 + 开/关接收窗口）、接收任务（CRC 校验 + 释放信号量） |
-| `modbus_polling.c/h` | FreeRTOS 轮询任务：每秒轮询 Controlboard（读离散输入 + 读保持寄存器） |
+| `modbus_master_tasks.c/h` | FreeRTOS 任务层：发送任务（中断发送 + 等 TX 完成信号量 + 开/关接收窗口）、接收任务（CRC 校验 + 存储数据 + 释放信号量） |
+| `modbus_polling.c/h` | FreeRTOS 轮询任务：每 50ms 顺序扫描地址 0-128，FC 0x02 读 130 bits 离散输入 |
+| `hostboard_registers.c/h` | 寄存器模块：128 路 Controlboard 线圈数据存储 + 零地址/重复地址检测 |
 | `modbus_callbacks.c` | HAL UART TX 完成回调（释放 `xMasterTxCompleteSem`） |
 
 ### 任务架构（共 4 个 FreeRTOS 任务）
@@ -209,8 +210,8 @@ Hostboard（STM32F407VET6, 168MHz）是上位机/中继板，通过 PowerBus 二
 | 任务 | 函数 | 优先级 | 栈(words) | 职责 |
 |------|------|--------|-----------|------|
 | MstSend | `TaskModbusSend` | 2 | 128 | 从队列取请求，构造 Modbus 帧，中断发送 + 等 TX 完成信号量，开/关接收窗口，等响应信号量，3.5 字符间隔 |
-| MstRecv | `TaskModbusReceive` | 2 | 128 | 等待 IDLE 中断填的原始帧队列，CRC 校验，释放信号量 |
-| MstPoll | `TaskModbusPoll` | 1 | 128 | 每 1000ms 轮询 Controlboard（读离散输入 + 读保持寄存器） |
+| MstRecv | `TaskModbusRecv` | 2 | 128 | 等待 IDLE 中断填的原始帧队列，CRC 校验，解析后存入寄存器模块（`HostReg_StoreCoilData`/`RecordZeroAddrResponse`/`RecordError`），释放信号量 |
+| MstPoll | `TaskModbusPoll` | 1 | 128 | 每 50ms 顺序扫描一个地址 (0-128)，FC 0x02 读 130 bits；回绕时调用 `HostReg_StepCycle()` 更新零地址和重复地址标志 |
 | IDLE | `Idle` | 0 | - | FreeRTOS 空闲任务 |
 
 ### USART1 外设
@@ -235,7 +236,7 @@ USART1 (PA9/PA10)  ─── 9600 8N1 ───  UART2 (PA2/PA3)
 ```
 
 - **从站地址**：Controlboard DIP 开关读取的地址（`ModbusReg_GetBoardAddr()`）
-- **主站目标地址**：`modbus_polling.h` 中 `CONTROLBOARD_ADDR` 宏定义（默认 1）
+- **主站轮询地址范围**：0-128（共 129 个地址），由 `modbus_polling.c` 动态循环扫描
 
 ### 数据流
 
@@ -270,9 +271,57 @@ USART1 (PA9/PA10)  ─── 9600 8N1 ───  UART2 (PA2/PA3)
 
 ### 当前轮询策略
 
-Hostboard `TaskModbusPoll` 每 1000ms 执行：
-1. 读离散输入（地址 0，32 位）→ 获取传感器在线/报警状态
-2. 读保持寄存器（地址 1，5 个）→ 获取传感器 1-5 的类型字节
+Hostboard `TaskModbusPoll` 每 50ms 顺序扫描一个地址：
+- **地址范围**：0-128（129 个地址），地址 0 用于检测误设为零地址的 Controlboard
+- **功能码**：FC 0x02，读取 130 bits（0-129）离散输入寄存器
+- **完整一轮**：129 × 50ms = **~6.45s**
+- **回绕处理**：地址超过 128 时，调用 `HostReg_StepCycle()` 更新检测标志
+
+接收任务 `TaskModbusRecv` 对响应进行三路分发：
+- **CRC 通过 + 地址 0 + FC 0x02** → `HostReg_RecordZeroAddrResponse()`（零地址检测计数）
+- **CRC 通过 + 地址 1-128 + FC 0x02** → `HostReg_StoreCoilData(addr, data, len)`（存入寄存器）
+- **CRC 失败 + 收到数据** → `HostReg_RecordError()`（计入重复地址检测）
+
+### Hostboard 寄存器模块 (hostboard_registers.c/h)
+
+独立模块，管理与 Controlboard 通信相关的数据存储和状态检测，类似 Controlboard 的 `modbus_registers.c`。
+
+**存储结构**：
+```c
+#define MAX_CTRLBD_ADDR     128     /* 最大 Controlboard 地址 */
+#define COIL_BYTE_COUNT     17      /* 130 bits = 16.25 → 17 字节 */
+
+static uint8_t board_coil_data[MAX_CTRLBD_ADDR + 1][COIL_BYTE_COUNT];
+/* board_coil_data[0] 预留；board_coil_data[1..128] 对应地址 1-128 */
+```
+
+**线圈布局（每个 Controlboard 的 17 字节）**：
+
+| 字节 | bit 范围 | 内容 |
+|-----|---------|------|
+| 0-7 | 0-63 | 传感器 #1-63 在线状态（位 0-62）+ 位 63 为传感器 #1 报警 |
+| 8-15 | 64-127 | 传感器 #2-63 报警标志（位 64-125）+ 零地址存在(126) + 地址重复(127) |
+| 16 | 128-129 | 全局报警(128) + 烟雾报警器状态(129) |
+
+**零地址检测**：
+- `HostReg_RecordZeroAddrResponse()` — 收到地址 0 的 CRC 有效 FC 0x02 响应时调用
+- 3 轮历史 OR：任意一轮有响应 → `zero_addr_present = 1`
+
+**重复地址检测（与 Controlboard 相同机制）**：
+- `HostReg_RecordError()` — CRC 失败且收到数据时调用
+- 3 轮历史累计 > 2 → `addr_conflict_flag = 1`
+
+**API**：
+```c
+void    HostReg_StoreCoilData(uint8_t addr, const uint8_t *data, uint8_t len);
+uint8_t HostReg_GetCoilByte(uint8_t addr, uint8_t byte_idx);
+uint8_t HostReg_GetCoilBit(uint8_t addr, uint16_t bit_idx);
+void    HostReg_RecordZeroAddrResponse(void);
+uint8_t HostReg_GetZeroAddrPresent(void);
+void    HostReg_RecordError(void);
+void    HostReg_StepCycle(void);
+uint8_t HostReg_GetAddrConflict(void);
+```
 
 ## Controlboard UART2 从站任务（新增）
 
@@ -563,13 +612,13 @@ arm-none-eabi-gdb build/Debug/Controlboard.elf
 
 ### 性能参数
 
-| 参数 | 值 | 说明 |
+| 性能参数 | 值 | 说明 |
 |------|----|------|
 | 响应超时 | 30ms | 在线传感器通常 10-50ms 回复 |
 | 3.5 字符间隔 | 4ms | 9600 baud 帧间距 |
-| 轮询间隔 | 50ms | TaskModbusPoll 每次轮询间延时 |
-| 顺序:在线穿插比 | 8:1 | 每 8 次顺序轮询插 1 次在线 |
-| 全址扫描周期 | ~3.6s | 72 次 × 50ms（全在线） |
+| Controlboard 轮询间隔 | 50ms | TaskModbusPoll（Controlboard）每次地址间延时 |
+| Controlboard 顺序:在线穿插比 | 8:1 | 每 8 次顺序轮询插 1 次在线 |
+| Controlboard 全址扫描周期 | ~3.6s | 72 次 × 50ms（全在线） |
 | 离线传感器耗时 | ~34ms/个 | 30ms 超时 + 4ms 间隔 |
 | 离线检测阈值 | 连续 3 轮无响应 | 约 3 个完整扫描周期 |
 | 地址重复检测窗口 | 连续 3 轮每轮错误 > 2 | 约 3 个完整扫描周期 |
@@ -577,7 +626,10 @@ arm-none-eabi-gdb build/Debug/Controlboard.elf
 | DWIN 传感器数据 | 逐帧发送 | 每次 Modbus 响应后排队发送，中断不阻塞 |
 | GREEN_LED | 每 10 次轮询翻转 | ~1Hz，低电平点亮 |
 | RED_LED / ORANGE_LED | 每 500ms | TaskDwinIcons 根据状态更新，低电平点亮 |
-| Hostboard 轮询间隔 | 1000ms | TaskModbusPoll 定时读取 Controlboard |
+| **Hostboard 轮询间隔** | **50ms/地址** | **TaskModbusPoll 顺序扫描地址 0-128，FC 0x02 读 130 bits** |
+| **Hostboard 完整一轮** | **~6.45s** | **129 地址 × 50ms** |
+| **Hostboard 零地址/重复地址更新** | **每 6.45s** | **每轮回绕时 StepCycle() 更新一次** |
+| **Hostboard 重复地址判定窗口** | **~19.35s** | **3 轮 × 6.45s** |
 | UART2 从站响应 | 由 Hostboard 请求触发 | TaskSlaveRecv 解析 → TaskSlaveSend 回复 |
 | UART2 从站过滤 | 仅响应本机 DIP 地址 | `slave_addr == ModbusReg_GetBoardAddr()` |
 | USART1 TX 完成超时 | 50ms | 中断发送等 TX 完成信号量 |
@@ -655,10 +707,16 @@ stcgal -p /dev/ttyUSB0 -b 115200 -t 11059 SensorBoard.hex
 
 | 位置 | 忽略内容 |
 |------|---------|
-| 根目录 `.gitignore` | `*.md`, `*.code-workspace`, `.claude/` |
+| 根目录 `.gitignore` | `*.code-workspace`, `.claude/` |
 | `Controlboard/.gitignore` | `.vscode/`, `build/`, `.clangd`, `*.sh`, `*.json`, `*.drawio`, `*.markdown`, `*.bkp` |
 
 > **注意**：`Controlboard/.gitignore` 排除了 `*.sh` 和 `*.json`，因此 `flash.sh`、`CMakePresets.json`、`launch.json` 等文件不会被 git 跟踪。这是有意为之，这些文件属于本地开发环境配置，不随仓库分发。
+
+## 工作规范
+
+### Git 操作
+
+用户要求自行控制 git add/commit/push 等操作。CLAUDE 不应擅自执行 git 提交、推送、cherry-pick 或合并。允许使用 git status/diff/log 等只读命令查看状态。修改文件后，列出变更让用户决定何时提交。
 
 ## 已知问题
 

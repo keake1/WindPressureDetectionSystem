@@ -44,11 +44,11 @@ static uint32_t last_seen_cycle[MODBUS_MAX_SLAVES + 1] = {0};
 static uint8_t  zero_addr_present = 0;    /* true: 0 地址传感器最近有过响应 */
 
 /* ==================== 地址重复检测 ====================
- * 统计每轮 CRC 错误次数，连续三轮每轮错误 > 2 次
+ * 统计每轮 CRC 错误次数，三轮累计错误 > 2 次
  * 视为存在地址重复（多个从机争抢同一地址导致帧冲突）。
  */
 #define ADDR_CONFLICT_CYCLES        3   /* 检测窗口：连续三轮 */
-#define ADDR_CONFLICT_ERR_THRESHOLD 2   /* 每轮错误次数阈值 */
+#define ADDR_CONFLICT_ERR_THRESHOLD 2   /* 三轮累计错误阈值 */
 
 static uint8_t  crc_error_count = 0;                              /* 当前周期累计 CRC 错误数 */
 static uint8_t  crc_error_history[ADDR_CONFLICT_CYCLES] = {0};    /* 过去三轮各自错误数 */
@@ -301,17 +301,10 @@ void ModbusReg_StepCycle(void)
     crc_error_hist_idx = (crc_error_hist_idx + 1) % ADDR_CONFLICT_CYCLES;
     crc_error_count = 0;
 
-    /* 检查历史中所有三轮是否都超过阈值 */
-    uint8_t conflict = 1;
-    for (uint8_t i = 0; i < ADDR_CONFLICT_CYCLES; i++)
-    {
-        if (crc_error_history[i] <= ADDR_CONFLICT_ERR_THRESHOLD)
-        {
-            conflict = 0;
-            break;
-        }
-    }
-    addr_conflict_flag = conflict;
+    /* 三轮累计错误数 > 2 → 地址重复标志 */
+    addr_conflict_flag = (crc_error_history[0]
+                       +  crc_error_history[1]
+                       +  crc_error_history[2]) > ADDR_CONFLICT_ERR_THRESHOLD;
 }
 
 /**
