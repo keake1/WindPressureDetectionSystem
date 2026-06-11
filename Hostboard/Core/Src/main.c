@@ -23,7 +23,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "uart1_modbus_master.h"
+#include "modbus_master_tasks.h"
+#include "modbus_polling.h"
+#include "FreeRTOS.h"
+#include "task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -91,6 +95,22 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
+
+  /* ---- 初始化 Modbus 主站队列和信号量 ---- */
+  ModbusMaster_InitQueues();
+
+  /* ---- 创建 Modbus 发送任务 ---- */
+  xTaskCreate(TaskModbusSend, "MstSend", 128, NULL, 2, NULL);
+
+  /* ---- 创建 Modbus 接收任务 ---- */
+  xTaskCreate(TaskModbusRecv, "MstRecv", 128, NULL, 2, NULL);
+
+  /* ---- 创建 Modbus 轮询任务（低优先级） ---- */
+  xTaskCreate(TaskModbusPoll, "MstPoll", 128, NULL, 1, NULL);
+
+  /* ---- 启动 FreeRTOS 调度器 ---- */
+  /* 调度器启动后，main 函数不再返回，由任务接管 */
+  vTaskStartScheduler();
 
   /* USER CODE END 2 */
 

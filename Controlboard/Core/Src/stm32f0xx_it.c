@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "uart1_modbus.h"
+#include "uart2_modbus_slave.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -202,6 +203,28 @@ void USART1_IRQHandler(void)
 void USART2_IRQHandler(void)
 {
   /* USER CODE BEGIN USART2_IRQn 0 */
+
+  /* ---- RXNE：收到一个字节 ---- */
+  if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_RXNE))
+  {
+      uint8_t data = (uint8_t)(huart2.Instance->RDR & 0xFF);
+      ModbusSlave_RxByteHandler(data);
+  }
+
+  /* ---- IDLE：总线空闲，一帧结束 ---- */
+  if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE))
+  {
+      __HAL_UART_CLEAR_IDLEFLAG(&huart2);
+      ModbusSlave_RxIdleHandler();
+  }
+
+  /* ---- ORE：溢出错误，必须写 ICR 清除 ----
+   * 若交给 HAL_UART_IRQHandler 处理，HAL 会视为阻塞性错误
+   * 并关闭 RXNEIE，导致 Modbus 接收静默失效。 */
+  if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_ORE))
+  {
+      __HAL_UART_CLEAR_OREFLAG(&huart2);
+  }
 
   /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);

@@ -24,7 +24,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "uart1_modbus.h"
+#include "uart2_modbus_slave.h"
 #include "modbus_tasks.h"
+#include "modbus_slave_tasks.h"
 #include "modbus_polling.h"
 #include "dwin.h"
 #include "FreeRTOS.h"
@@ -140,6 +142,19 @@ int main(void)
       1,
       NULL
   );
+
+  /* ---- 初始化 UART2 Modbus 从站队列 ---- */
+  ModbusSlave_InitQueues();
+
+  /* ---- 创建 UART2 从站接收任务 ---- */
+  xTaskCreate(TaskSlaveRecv, "SlaveRecv", 128, NULL, 2, NULL);
+
+  /* ---- 创建 UART2 从站发送任务 ---- */
+  xTaskCreate(TaskSlaveSend, "SlaveSend", 128, NULL, 2, NULL);
+
+  /* ---- 开启 USART2 接收中断 ---- */
+  ModbusSlave_StartRx();
+
   /* ---- 开启 USART1 接收中断（RXNE + IDLE） ---- */
   /* 注意：必须在任务创建之后、调度器启动之前调用 */
   ModbusMaster_StartRx();

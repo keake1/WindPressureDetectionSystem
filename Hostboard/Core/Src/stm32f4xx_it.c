@@ -22,6 +22,7 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "uart1_modbus_master.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -213,6 +214,29 @@ void SysTick_Handler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
+
+  /* ---- RXNE：收到一个字节 ---- */
+  if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_RXNE))
+  {
+      /* F4 系列数据寄存器为 DR（而非 F0 的 RDR） */
+      uint8_t data = (uint8_t)(huart1.Instance->DR & 0xFF);
+      ModbusMaster_RxByteHandler(data);
+  }
+
+  /* ---- IDLE：总线空闲，一帧结束 ---- */
+  if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE))
+  {
+      __HAL_UART_CLEAR_IDLEFLAG(&huart1);
+      ModbusMaster_RxIdleHandler();
+  }
+
+  /* ---- ORE：溢出错误，必须写 ICR 清除 ----
+   * 若交给 HAL_UART_IRQHandler 处理，HAL 会视为阻塞性错误
+   * 并关闭 RXNEIE，导致 Modbus 接收静默失效。 */
+  if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_ORE))
+  {
+      __HAL_UART_CLEAR_OREFLAG(&huart1);
+  }
 
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
