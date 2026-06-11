@@ -2,11 +2,13 @@
 /**
   ******************************************************************************
   * @file           : modbus_polling.h
-  * @brief          : Modbus 轮询任务 — 定时读取 Controlboard 数据
+  * @brief          : Modbus 轮询任务 — 定时读取所有 Controlboard 离散输入
   *
-  * 轮询内容：
-  *   1. 读离散输入寄存器：获取 Controlboard 的传感器在线/报警状态
-  *   2. 读保持寄存器：获取 Controlboard 的传感器类型和数据
+  * 轮询内容：FC 0x02 读取 0-129 位离散输入寄存器，获取每个 Controlboard
+  * 的传感器在线/报警状态、零地址/重复地址/全局报警标志。
+  *
+  * 轮询地址范围：0-128（含地址 0 用于零地址检测）
+  * 轮询间隔：50ms（每个地址之间固定延时）
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -25,18 +27,6 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
-
-/* Exported constants --------------------------------------------------------*/
-
-/** @defgroup Poll_Config 轮询配置 */
-/** @{ */
-#define CONTROLBOARD_ADDR      1            /* Controlboard DIP 硬件地址（可调整） */
-#define POLL_INTERVAL_MS       1000         /* 轮询间隔：每秒一次 */
-/** @} */
-
-/* USER CODE BEGIN EConst */
-
-/* USER CODE END EConst */
 
 /* Exported functions prototypes ---------------------------------------------*/
 
