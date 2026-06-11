@@ -83,7 +83,7 @@ void TaskSlaveRecv(void *arg)
         uint8_t  func_code  = raw.frame[1];
         uint8_t  own_addr   = ModbusReg_GetBoardAddr();
 
-        /* 地址过滤：只响应发给本机地址的请求，地址 0 为广播永不响应 */
+        /* 地址过滤：只响应发给本机地址的请求 */
         if (slave_addr != own_addr)
             continue;
 

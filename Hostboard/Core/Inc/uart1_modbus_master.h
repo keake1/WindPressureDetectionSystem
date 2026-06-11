@@ -71,6 +71,18 @@ typedef struct {
 
 /* USER CODE BEGIN ET */
 
+/**
+ * @brief  最近一次发送的 Modbus 请求信息
+ * @note   发送任务在发帧前写入，接收任务据此解析响应数据的位置。
+ *         同一时刻只有一帧在飞行，不存在竞态。
+ */
+typedef struct {
+    uint8_t  slave_addr;   /* 请求的从机地址 */
+    uint8_t  func_code;    /* 功能码 (0x02/0x03) */
+    uint16_t reg_addr;     /* 寄存器起始地址 */
+    uint16_t reg_count;    /* 请求的寄存器/位数数量 */
+} HostboardLastReq_t;
+
 /* USER CODE END ET */
 
 /* Exported queue/semaphore handles -----------------------------------------*/
@@ -78,6 +90,7 @@ typedef struct {
 extern QueueHandle_t      xMasterSendQueue;        /* 发送队列 */
 extern SemaphoreHandle_t  xMasterRxSem;            /* 接收完成信号量 */
 extern SemaphoreHandle_t  xMasterTxCompleteSem;    /* USART1 TX 完成信号量 */
+extern HostboardLastReq_t g_host_last_req;         /* 当前在飞的请求信息 */
 
 /* Exported functions prototypes ---------------------------------------------*/
 

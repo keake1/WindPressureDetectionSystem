@@ -89,6 +89,12 @@ uint8_t HostReg_GetAddrConflict(void);
 uint8_t HostReg_IsOnline(uint8_t addr);
 /** @} */
 
+/** @defgroup HostReg_Partial 局部位写入（精简轮询） */
+/** @{ */
+void HostReg_StorePartialBits(uint8_t addr, uint16_t reg_addr,
+                              uint16_t bit_count, const uint8_t *data);
+/** @} */
+
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */

@@ -166,6 +166,43 @@ uint8_t HostReg_IsOnline(uint8_t addr)
     return ctrl_boards[addr].online;
 }
 
+/* ==================== 局部位写入（精简轮询） ==================== */
+
+/**
+ * @brief  将响应数据按位写入 coil_data 的指定偏移
+ * @param  addr       Controlboard 地址 (1-128)
+ * @param  reg_addr   位起始地址（如 126）
+ * @param  bit_count  位数（如 3）
+ * @param  data       响应数据指针（大端序填充）
+ *
+ * 用于精简轮询场景：只读取 3 bits (126-128)，收到 1 字节后
+ * 按位复制到 ctrl_boards[addr].coil_data 的正确位置。
+ */
+void HostReg_StorePartialBits(uint8_t addr, uint16_t reg_addr,
+                              uint16_t bit_count, const uint8_t *data)
+{
+    if (addr < 1 || addr > MAX_CTRLBD_ADDR)
+        return;
+
+    for (uint16_t i = 0; i < bit_count; i++)
+    {
+        uint8_t  bit_val  = (data[i / 8] >> (i % 8)) & 1;
+        uint16_t dst_bit  = reg_addr + i;
+        uint8_t  byte_off = dst_bit / 8;
+        uint8_t  bit_off  = dst_bit % 8;
+
+        if (byte_off >= COIL_BYTE_COUNT)
+            break;
+
+        ctrl_boards[addr].coil_data[byte_off] &= ~(1 << bit_off);
+        ctrl_boards[addr].coil_data[byte_off] |= (bit_val << bit_off);
+    }
+
+    /* 收到有效响应 → 更新在线标志 */
+    ctrl_boards[addr].online = 1;
+    ctrl_boards[addr].last_seen_cycle = current_cycle;
+}
+
 /* ==================== 周期更新 ==================== */
 
 /**

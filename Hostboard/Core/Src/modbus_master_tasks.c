@@ -66,6 +66,12 @@ void TaskModbusSend(void *arg)
         /* 清除可能残留的信号量（上次超时后接收任务可能仍会 Give） */
         xSemaphoreTake(xMasterRxSem, 0);
 
+        /* 记录当前请求信息（供接收任务解析响应数据的位置） */
+        g_host_last_req.slave_addr = req.slave_addr;
+        g_host_last_req.func_code  = req.func_code;
+        g_host_last_req.reg_addr   = req.reg_addr;
+        g_host_last_req.reg_count  = req.reg_value;
+
         /* ---- 3. 构造 Modbus RTU 帧 (8 字节) ---- */
         tx_buf[0] = req.slave_addr;
         tx_buf[1] = req.func_code;
@@ -122,8 +128,8 @@ void TaskModbusRecv(void *arg)
             uint8_t  func_code  = raw.frame[1];
             uint8_t  byte_cnt   = raw.frame[2];
 
-            /* 地址 0：仅 FC 0x02 响应视为有效的零地址检测 */
-            if (slave_addr == 0 && func_code == 0x02)
+            /* 地址 0：任何 CRC 有效的响应均视为零地址存在 */
+            if (slave_addr == 0)
             {
                 HostReg_RecordZeroAddrResponse();
             }
@@ -131,10 +137,22 @@ void TaskModbusRecv(void *arg)
             else if (slave_addr >= 1 && slave_addr <= MAX_CTRLBD_ADDR
                      && func_code == 0x02
                      && byte_cnt > 0
-                     && byte_cnt <= COIL_BYTE_COUNT
                      && (3 + byte_cnt + 2) <= raw.length)
             {
-                HostReg_StoreCoilData(slave_addr, &raw.frame[3], byte_cnt);
+                if (byte_cnt >= COIL_BYTE_COUNT)
+                {
+                    /* 全量 17 字节响应 → 完整覆盖 */
+                    HostReg_StoreCoilData(slave_addr, &raw.frame[3], byte_cnt);
+                }
+                else if (byte_cnt == 1 && slave_addr == g_host_last_req.slave_addr)
+                {
+                    /* 精简 1 字节响应 → 按位写入指定偏移 */
+                    HostReg_StorePartialBits(slave_addr,
+                                             g_host_last_req.reg_addr,
+                                             g_host_last_req.reg_count,
+                                             &raw.frame[3]);
+                }
+                /* else: 其他长度 → 忽略（不应发生） */
             }
             /* else: 功能码异常或格式错误 → 忽略不计 */
 

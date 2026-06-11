@@ -33,6 +33,9 @@ QueueHandle_t      xMasterSendQueue    = NULL;
 SemaphoreHandle_t  xMasterRxSem        = NULL;
 SemaphoreHandle_t  xMasterTxCompleteSem = NULL;
 
+/* 最近一次发送的 Modbus 请求信息（供接收任务解析） */
+HostboardLastReq_t g_host_last_req;
+
 /* 原始响应队列（ISR → 接收任务） */
 static QueueHandle_t xMasterRawRxQueue = NULL;
 
