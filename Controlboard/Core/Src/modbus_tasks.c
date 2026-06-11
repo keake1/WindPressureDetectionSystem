@@ -40,6 +40,16 @@
 /* Live Watch 配合 poll_debug_tx_tick 观察轮询往返时间 */
 volatile uint32_t poll_debug_rx_tick = 0;
 
+/* ==================== 调试：串口1 最近接收帧 ====================
+ * Live Watch 添加以下变量即可直观看到每帧内容：
+ *   debug_rx_frame  - 最近一帧原始字节（未用部分清 0）
+ *   debug_rx_len    - 该帧长度
+ *   debug_rx_count  - 累计接收帧数（观察是否在持续收帧）
+ */
+volatile uint8_t  debug_rx_frame[MODBUS_RX_BUF_SIZE] = {0};
+volatile uint16_t debug_rx_len   = 0;
+volatile uint32_t debug_rx_count = 0;
+
 /* USER CODE END 0 */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -101,6 +111,12 @@ void TaskModbusReceive(void *arg)
         /* ---- 1. 等待原始帧（IDLE 中断放入队列） ---- */
         if (ModbusMaster_DequeueRawFrame(&raw, portMAX_DELAY) != 0)
             continue;
+
+        /* ---- 调试：保存最近一帧到调试数组 ---- */
+        for (uint16_t i = 0; i < MODBUS_RX_BUF_SIZE; i++)
+            debug_rx_frame[i] = (i < raw.length) ? raw.frame[i] : 0;
+        debug_rx_len = raw.length;
+        debug_rx_count++;
 
         /* ---- 2. CRC 校验 ---- */
         uint8_t crc_ok = 0;

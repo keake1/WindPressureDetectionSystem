@@ -172,14 +172,21 @@ void USART1_IRQHandler(void)
   /* ---- IDLE：总线空闲，一帧结束 ---- */
   if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE))
   {
-      /* IDLE 标志清除序列：读 ISR → 读 RDR */
-      volatile uint32_t tmp;
-      tmp = huart1.Instance->ISR;
-      tmp = huart1.Instance->RDR;
-      (void)tmp;
+      /* F0 系列（新版 USART IP）必须通过写 ICR 清除 IDLE 标志。
+       * 注意：F1 的"读 SR → 读 DR"序列在 F0 上无效，
+       * 若不写 ICR，IDLE 将持续置位导致中断风暴，饿死所有任务。 */
+      __HAL_UART_CLEAR_IDLEFLAG(&huart1);
 
       /* 将完整帧送入原始响应队列 */
       ModbusMaster_RxIdleHandler();
+  }
+
+  /* ---- ORE：溢出错误，必须写 ICR 清除 ----
+   * 若交给 HAL_UART_IRQHandler 处理，HAL 会视为阻塞性错误
+   * 并关闭 RXNEIE，导致 Modbus 接收静默失效。 */
+  if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_ORE))
+  {
+      __HAL_UART_CLEAR_OREFLAG(&huart1);
   }
 
   /* USER CODE END USART1_IRQn 0 */

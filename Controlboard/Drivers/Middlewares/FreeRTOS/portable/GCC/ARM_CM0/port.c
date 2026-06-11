@@ -815,6 +815,24 @@ void SysTick_Handler( void ) /* PRIVILEGED_FUNCTION */
 {
     uint32_t ulPreviousMask;
 
+    /* Keep STM32 HAL timebase running.  HAL_IncTick() is a weak function
+     * defined in stm32f0xx_hal.c and must be called at each SysTick
+     * interrupt for HAL_Delay() and other HAL timekeeping to work. */
+    {
+        extern void HAL_IncTick( void );
+        HAL_IncTick();
+    }
+
+    /* 关键保护：HAL_Init() 在 main 一开始就启动了 SysTick（1kHz），
+     * 而此时 FreeRTOS 内核尚未初始化（pxDelayedTaskList 等链表为 NULL、
+     * xNextTaskUnblockTime 为 0）。若在调度器启动前调用
+     * xTaskIncrementTick()，会解引用空链表导致 HardFault 卡死。
+     * 因此调度器未启动时仅维护 HAL 时基，直接返回。 */
+    if( xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED )
+    {
+        return;
+    }
+
     ulPreviousMask = portSET_INTERRUPT_MASK_FROM_ISR();
 
     traceISR_ENTER();
@@ -833,14 +851,6 @@ void SysTick_Handler( void ) /* PRIVILEGED_FUNCTION */
     }
 
     portCLEAR_INTERRUPT_MASK_FROM_ISR( ulPreviousMask );
-
-    /* Keep STM32 HAL timebase running.  HAL_IncTick() is a weak function
-     * defined in stm32f0xx_hal.c and must be called at each SysTick
-     * interrupt for HAL_Delay() and other HAL timekeeping to work. */
-    {
-        extern void HAL_IncTick( void );
-        HAL_IncTick();
-    }
 }
 
 /*-----------------------------------------------------------*/
