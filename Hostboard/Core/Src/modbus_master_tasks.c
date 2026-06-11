@@ -60,9 +60,6 @@ void TaskModbusSend(void *arg)
         if (xQueueReceive(xMasterSendQueue, &req, portMAX_DELAY) != pdPASS)
             continue;
 
-        /* ---- 2. 开启接收中断窗口 ---- */
-        ModbusMaster_StartRx();
-
         /* 清除可能残留的信号量（上次超时后接收任务可能仍会 Give） */
         xSemaphoreTake(xMasterRxSem, 0);
 
@@ -84,11 +81,12 @@ void TaskModbusSend(void *arg)
         tx_buf[6] = (uint8_t)(crc & 0xFF);
         tx_buf[7] = (uint8_t)(crc >> 8);
 
-        /* ---- 4. 中断发送 ---- */
+        /* ---- 4. 中断发送（发送完成后再开接收窗，避免自回声触发假 IDLE） ---- */
         HAL_UART_Transmit_IT(&huart1, tx_buf, 8);
         xSemaphoreTake(xMasterTxCompleteSem, pdMS_TO_TICKS(50));
 
-        /* ---- 5. 等待响应 ---- */
+        /* ---- 5. 发送完成 → 开启接收窗口，等待响应 ---- */
+        ModbusMaster_StartRx();
         xSemaphoreTake(xMasterRxSem, MODBUS_RESP_TIMEOUT);
 
         /* ---- 6. 关闭接收中断窗口 ---- */

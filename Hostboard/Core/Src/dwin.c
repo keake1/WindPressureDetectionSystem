@@ -22,6 +22,9 @@ static volatile uint8_t  dwin_rx_buf[DWIN_RX_BUF_SIZE];  /* 接收缓冲区 */
 static volatile uint16_t dwin_rx_idx;          /* 缓冲区当前写入位置 */
 static volatile uint16_t dwin_rx_expected;     /* 预期总长度（含帧头+LEN） */
 
+/* 报警记录环形写入索引（DWIN_WriteAlarmRecord 使用） */
+static uint8_t s_alarmIdx = 0;
+
 /* USER CODE END 0 */
 
 /**
@@ -170,8 +173,7 @@ void DWIN_WriteAlarmRecord(const DWIN_RTC_t *rtc, uint8_t ctrlAddr, uint8_t sens
         return;
     }
 
-    /* 环形写入索引，静态保持 */
-    static uint8_t s_alarmIdx = 0U;
+    /* 环形写入索引（文件 scope，在 InitQueues 中归零） */
 
     /* 计算本条记录的变量地址 */
     uint16_t addr = (uint16_t)(DWIN_ALARM_BASE_ADDR
@@ -189,7 +191,7 @@ void DWIN_WriteAlarmRecord(const DWIN_RTC_t *rtc, uint8_t ctrlAddr, uint8_t sens
     buf[4] = rtc->hour;
     buf[5] = rtc->minute;
     buf[6] = ctrlAddr;                     /* 控制器地址（原 buf[7]，秒字段移除）*/
-    buf[7] = sensorIdx + 1;                    /* 报警传感器槽位索引（0~63，未知=0xFF）*/
+    buf[7] = sensorIdx + 1;                    /* 报警传感器槽位索引（0~63)*/
 
     DWIN_WriteVar(addr, buf, sizeof(buf));
 
@@ -199,7 +201,9 @@ void DWIN_WriteAlarmRecord(const DWIN_RTC_t *rtc, uint8_t ctrlAddr, uint8_t sens
     {
         s_alarmIdx = 0U;
     }
-}/**
+}
+
+/****
  * @brief 计算字节数组的 CRC16（多项式 0x8005，初值 0xFFFF）
  *
  * 用于备注数据的完整性校验：
@@ -229,7 +233,9 @@ uint16_t DWIN_CalcCRC16(const uint8_t *pData, uint16_t len)
         }
     }
     return crc;
-}/**
+}
+
+/*
  * @brief 从片内 NorFlash 数据库读取数据到变量存储空间（0x08 寄存器，读操作）
  *
  * 帧格式（共 12 字节）：
@@ -283,6 +289,9 @@ void Dwin_InitQueues(void)
 
     if (xDwinTxCompleteSem == NULL)
         xDwinTxCompleteSem = xSemaphoreCreateBinary();
+
+    /* 重置报警记录环形索引（重启后从头写入） */
+    s_alarmIdx = 0;
 }
 
 /* ==================== USART3 发送 ==================== */
@@ -299,7 +308,7 @@ void UART3_Send(const uint8_t *buf, uint16_t len)
     for (uint16_t i = 0; i < len; i++)
         frame.data[i] = buf[i];
 
-    xQueueSend(xDwinTxQueue, &frame, portMAX_DELAY);
+    xQueueSend(xDwinTxQueue, &frame, pdMS_TO_TICKS(100));
 }
 
 /* ==================== USART3 RX 状态机 ==================== */

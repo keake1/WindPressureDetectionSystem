@@ -113,9 +113,10 @@ int main(void)
   /* ---- 创建 Modbus 轮询任务（低优先级） ---- */
   xTaskCreate(TaskModbusPoll, "MstPoll", 128, NULL, 1, NULL);
 
-  /* ---- 创建 USART3 迪文屏发送/接收任务 ---- */
+  /* ---- 创建 USART3 迪文屏发送/接收/图标更新任务 ---- */
   xTaskCreate(TaskDwinTx, "DwinTx", 128, NULL, 1, NULL);
   xTaskCreate(TaskDwinRx, "DwinRx", 128, NULL, 1, NULL);
+  xTaskCreate(TaskDwinIcons, "DwinIcons", 128, NULL, 1, NULL);
 
   /* ---- 启动 FreeRTOS 调度器 ---- */
   /* 调度器启动后，main 函数不再返回，由任务接管 */

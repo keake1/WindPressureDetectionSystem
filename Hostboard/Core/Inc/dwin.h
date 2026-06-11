@@ -137,8 +137,9 @@ typedef struct {
 #define DWIN_ALARM_MAX_RECORDS      12U      /* 最多保存 12 条 */
 
 /* USER CODE BEGIN EConst */
-
-#define DWIN_SENSOR_STATUS_ICON_ADDR    0x1890U /* 传感器状态图标区（对应控制器状态图标区的后半部分，地址 129~192）*/
+#define DWIN_HOST_STATUS_ICON_ADDR  0x1881U  /* Hostboard 状态图标地址 */
+#define DWIN_ICONS_PER_FRAME        32U       /* 每帧图标数（32 icons × 2 bytes = 64 bytes data）*/   
+#define DWIN_SENSOR_STATUS_ICON_ADDR    0x1890U /* 传感器状态图标区*/
 #define DWIN_SENSOR_DATA_ADDR       0x1900U  /* 传感器数据区（屏幕读回后存放处） */
 #define SEWNSOR_NUM_PER_CTRL              64U       /* 每个控制器的传感器数量（对应图标数量）*/
 #define DWIN_SELECT_CTRL_ADDR       0x3100U  /* 屏幕选中控制器地址 */

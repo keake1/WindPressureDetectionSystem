@@ -29,11 +29,11 @@ WindPressureDetectionSystem/
 │   │   └── stm32cubemx/CMakeLists.txt
 │   ├── startup_stm32f070xb.s
 │   └── STM32F070XX_FLASH.ld
-├── Hostboard/           # 上位机/中继板 (STM32F407VET6 + FreeRTOS) — 通过 PowerBus 二总线与 Controlboard 通信
+├── Hostboard/           # 上位机/中继板 (STM32F407VET6 + FreeRTOS) — 通过 PowerBus 二总线与 Controlboard 通信 + USART3 驱动迪文屏
 │   ├── CMakeLists.txt   # CMake + Ninja 构建
 │   ├── CMakePresets.json
 │   ├── Core/
-│   │   ├── Src/         # 应用代码（含 Modbus 主站驱动）
+│   │   ├── Src/         # 应用代码（含 Modbus 主站驱动、DWIN 屏驱动）
 │   │   └── Inc/         # 头文件
 │   ├── Drivers/
 │   │   ├── STM32F4xx_HAL_Driver/
@@ -67,6 +67,21 @@ WindPressureDetectionSystem/
 | Controlboard | STM32F070xB (Cortex-M0, 48MHz) | CMake + Ninja | `arm-none-eabi-gcc` (/opt/arm-gnu-toolchain-15.2.rel1) |
 | 风压传感器 | STC8H1K28-36I-LQFP32 (51 内核) | SDCC (bash/PowerShell) | `sdcc -mmcs51` |
 | CO/余压/7合1传感器 | STC8H 系列 (51 内核) | Keil μVision (Windows) | C51 |
+
+## 快速命令参考
+
+| 操作 | 命令（从项目根目录） |
+|------|----------------------|
+| 编译 Controlboard | `cd Controlboard && cmake --preset Debug && cmake --build --preset Debug` |
+| 编译 + 烧录 Controlboard | `cd Controlboard && cmake --build build/Debug --target flash` |
+| 仅烧录 Controlboard | `cd Controlboard && ./flash.sh` |
+| 编译 Hostboard | `cd Hostboard && cmake --preset Debug && cmake --build --preset Debug` |
+| 烧录 Hostboard | `openocd -f interface/stlink-v2.cfg -f target/stm32f4x.cfg -c "program Hostboard/build/Debug/Hostboard.elf verify reset exit"` |
+| 编译风压传感器 | `cd 风压传感器 && ./tools/build.sh` |
+| 烧录风压传感器 | `cd 风压传感器 && ./tools/flash.sh` |
+| 烧录 7合1传感器 | `cd 7合1传感器 && ./tools/flash.sh` |
+| 调试 Controlboard (GDB) | `cd Controlboard && arm-none-eabi-gdb build/Debug/Controlboard.elf -ex "target remote :3333" -ex "load"` |
+| 调试 Hostboard (GDB) | `cd Hostboard && arm-none-eabi-gdb build/Debug/Hostboard.elf -ex "target remote :3333" -ex "load"` |
 
 ## Controlboard 外设
 
@@ -193,7 +208,7 @@ Controlboard 是下位机控制器（STM32F070xB, 48MHz），同时承担两个 
 
 ## Hostboard 架构
 
-Hostboard（STM32F407VET6, 168MHz）是上位机/中继板，通过 PowerBus 二总线与 Controlboard 通信，读取 Controlboard 的传感器数据。
+Hostboard（STM32F407VET6, 168MHz）是上位机/中继板，通过 PowerBus 二总线与 Controlboard 通信，读取 Controlboard 的传感器数据，同时通过 USART3 驱动第二块迪文屏实现人机交互。
 
 ### 模块文件
 
@@ -203,15 +218,20 @@ Hostboard（STM32F407VET6, 168MHz）是上位机/中继板，通过 PowerBus 二
 | `modbus_master_tasks.c/h` | FreeRTOS 任务层：发送任务（中断发送 + 等 TX 完成信号量 + 开/关接收窗口）、接收任务（CRC 校验 + 存储数据 + 释放信号量） |
 | `modbus_polling.c/h` | FreeRTOS 轮询任务：每 50ms 顺序扫描地址 0-128，FC 0x02 读 130 bits 离散输入 |
 | `hostboard_registers.c/h` | 寄存器模块：128 路 Controlboard 线圈数据存储 + 零地址/重复地址检测 |
-| `modbus_callbacks.c` | HAL UART TX 完成回调（释放 `xMasterTxCompleteSem`） |
+| `dwin.c/h` | 迪文屏驱动：帧构建（0x82/0x83）、NorFlash 读写、RTC 读取、报警记录写入、CRC16 计算；队列初始化；ISR 驱动（状态机帧检测） |
+| `dwin_tasks.c/h` | USART3 迪文屏 FreeRTOS 收发任务：TaskDwinTx（队列→中断发送）、TaskDwinRx（0x83 应答解析：备注/地址/RTC） |
+| `modbus_callbacks.c` | HAL UART TX 完成回调（释放 `xMasterTxCompleteSem` / `xDwinTxCompleteSem`） |
 
-### 任务架构（共 4 个 FreeRTOS 任务）
+### 任务架构（共 7 个 FreeRTOS 任务）
 
 | 任务 | 函数 | 优先级 | 栈(words) | 职责 |
 |------|------|--------|-----------|------|
 | MstSend | `TaskModbusSend` | 2 | 128 | 从队列取请求，构造 Modbus 帧，中断发送 + 等 TX 完成信号量，开/关接收窗口，等响应信号量，3.5 字符间隔 |
 | MstRecv | `TaskModbusRecv` | 2 | 128 | 等待 IDLE 中断填的原始帧队列，CRC 校验，解析后存入寄存器模块（`HostReg_StoreCoilData`/`RecordZeroAddrResponse`/`RecordError`），释放信号量 |
 | MstPoll | `TaskModbusPoll` | 1 | 128 | 每 50ms 顺序扫描一个地址 (0-128)，FC 0x02 读 130 bits；回绕时调用 `HostReg_StepCycle()` 更新零地址和重复地址标志 |
+| DwinTx | `TaskDwinTx` | 1 | 128 | 从 xDwinTxQueue 取帧，HAL_UART_Transmit_IT 中断发送，等 xDwinTxCompleteSem（50ms 超时） |
+| DwinRx | `TaskDwinRx` | 1 | 128 | 从 xDwinRxQueue 取 ISR 状态机组装的完整帧，解析 0x83 应答（备注写入 NorFlash / 开机恢复 / 选中地址 / RTC 时间） |
+| DwinIcons | `TaskDwinIcons` | 1 | 128 | 每 500ms 更新迪文屏图标：4 帧控制器图标（1-128 地址）+ 1 帧系统状态（重复地址/零地址/报警/正常） |
 | IDLE | `Idle` | 0 | - | FreeRTOS 空闲任务 |
 
 ### USART1 外设
@@ -322,6 +342,159 @@ void    HostReg_RecordError(void);
 void    HostReg_StepCycle(void);
 uint8_t HostReg_GetAddrConflict(void);
 ```
+
+## Hostboard USART3 迪文屏架构
+
+Hostboard 通过 USART3 连接第二块迪文屏（DGUS II），实现双向通信：
+
+| 外设 | 用途 | 参数 |
+|------|------|------|
+| USART3 | 迪文屏 (DWIN) 双向通信 | 115200 8N1, TX=PB10, RX=PB11 |
+
+### 协议
+
+DGUS II 变长帧协议，所有帧以 `0x5A 0xA5` 开头：
+
+```
+5A A5 [LEN] [CMD] [DATA...]
+LEN = 数据域字节数（不含 0x5A 0xA5 LEN 三字节）
+```
+
+| 指令 | 方向 | 用途 |
+|------|------|------|
+| `0x82` | Hostboard → 屏 | 写变量（传感器数据、图标、RTC、NorFlash 操作等） |
+| `0x83` | 屏 → Hostboard | 读变量应答（备注内容、选中地址、RTC 时间等） |
+
+### ISR 状态机（字节级帧检测）
+
+USART3_IRQHandler 实现 4 状态帧组装状态机：
+
+```
+WAIT_5A  →  收到 0x5A  →  WAIT_A5
+WAIT_A5  →  收到 0xA5  →  WAIT_LEN （否则回 WAIT_5A）
+WAIT_LEN →  收到 LEN 字节 → DATA（记录期望总长度 total = 3 + LEN）
+DATA     →  累计到 total 字节 → 完整帧入队 xDwinRxQueue → WAIT_5A
+```
+
+- **RXNE**：调用 `DwinRxByteHandler(data)` 驱动状态机
+- **ORE**：调用 `DwinRxReset()` 清状态机回 WAIT_5A
+- 帧完成后通过 `xQueueSendFromISR(xDwinRxQueue)` 通知接收任务
+- 若 `portYIELD_FROM_ISR` 返回 pdTRUE，立即上下文切换
+
+### 队列与任务架构
+
+```
+DWIN_WriteVar() / DWIN_ReadVar() / DWIN_NorFlashWrite() / DWIN_ReadRTC()
+  │  构建 0x82 或 0x83 帧 → UART3_Send()
+  │    UART3_Send() → xQueueSend(xDwinTxQueue)
+  │                          │
+  │                    [xDwinTxQueue(8)]
+  │                          │
+  │                    TaskDwinTx（优先级 1）
+  │                      ├─ xQueueReceive(xDwinTxQueue)
+  │                      ├─ HAL_UART_Transmit_IT(&huart3)
+  │                      └─ xSemaphoreTake(xDwinTxCompleteSem, 50ms)
+  │
+  │                    USART3 ISR（状态机）
+  │                      ├─ RXNE → DwinRxByteHandler() → 状态机
+  │                      └─ 完整帧 → xQueueSendFromISR(xDwinRxQueue)
+  │                          │
+  │                    [xDwinRxQueue(4)]
+  │                          │
+  │                    TaskDwinRx（优先级 1）
+  │                      ├─ xQueueReceive(xDwinRxQueue)
+  │                      └─ 解析 0x83 应答
+```
+
+### 模块文件
+
+| 文件 | 职责 |
+|------|------|
+| `dwin.c/h` | 帧构建 API：`DWIN_WriteVar`（0x82 写变量）、`DWIN_ReadVar`（0x83 读请求）、`DWIN_NorFlashWrite/Read`、`DWIN_ReadRTC`、`DWIN_WriteAlarmRecord`、`DWIN_CalcCRC16`；队列初始化 `Dwin_InitQueues`；ISR 驱动 `DwinRxByteHandler`/`DwinRxReset`；发送入口 `UART3_Send` |
+| `dwin_tasks.c/h` | TaskDwinTx（队列取帧→中断发送）、TaskDwinRx（0x83 应答解析）、TaskDwinIcons（每 500ms 更新图标） |
+
+### 图标更新任务 (TaskDwinIcons)
+
+每 500ms 组装 5 帧图标数据，通过 DWIN_WriteVar 批量发送：
+
+| 帧 | 地址 | 内容 | data_len |
+|----|------|------|---------|
+| 1 | `0x1800` | 控制器 1-32 图标 | 64 字节 |
+| 2 | `0x1820` | 控制器 33-64 图标 | 64 字节 |
+| 3 | `0x1840` | 控制器 65-96 图标 | 64 字节 |
+| 4 | `0x1860` | 控制器 97-128 图标 | 64 字节 |
+| 5 | `0x1881` | 系统状态图标 | 2 字节 |
+
+**控制器图标判定**（每地址独立）：
+```
+离线 → DWIN_ICON_OFFLINE (0x0000)
+在线且零地址/重复地址 → DWIN_ICON_TROUBLE (0x0002)
+在线且全局报警 → DWIN_ICON_ALARM (0x0003)
+在线且正常 → DWIN_ICON_NORMAL (0x0001)
+```
+
+**系统状态图标判定**（全局）：
+```
+有重复地址 → 3
+有零地址 → 2
+任一控制器报警 → 1
+正常 → 0
+```
+
+### 接收任务 (TaskDwinRx) 解析分支
+
+收到 `0x5A 0xA5 [LEN] 0x83 [addrH] [addrL] [data...]` 后，按变量地址分发：
+
+| 地址范围 | 用途 | 处理 |
+|---------|------|------|
+| `0x1000~0x17FF` | 备注写入（屏幕下发备注） | 校验 → 计算 CRC → 通过 DWIN_WriteVar 写入暂存区 → vTaskDelay(20ms) → DWIN_NorFlashWrite 写入 NorFlash → vTaskDelay(30ms) |
+| `0x3220` | 开机恢复（NorFlash → 变量） | CRC 校验 → DWIN_WriteVar 写入屏变量区 |
+| `0x3100` | 屏幕选中控制器地址 | 存入 `g_hostDwinStatus.selectAddr` |
+| `0x0010` | RTC 时间 | 填充 `g_hostDwinStatus.rtcYear/Month/Day/Hour/Minute/Second`，置 `rtcReady=1` |
+
+### 变量区布局
+
+| 地址 | 用途 | 说明 |
+|------|------|------|
+| `0x1000` | 备注变量区起始 | 128 个槽位，每槽 0x10 地址，备注内容最长 30 字节 + CRC16 |
+| `0x1800~0x187F` | 控制器状态图标 | 128 个 word，下标=地址-1，值：0=离线 1=正常 2=故障 3=报警 |
+| `0x1881` | 系统状态图标 | 1 个 word，3=重复地址 2=零地址 1=有报警 0=正常 |
+| `0x1890` | 传感器状态图标 | 对应地址 129~192 的传感器图标 |
+| `0x1900` | 传感器数据区 | 屏幕读回后的传感器数据存放处 |
+| `0x2000~0x202C` | 报警记录区 | 12 条循环记录，每条 8 字节（年月日时分+地址+槽位） |
+| `0x3100` | 选中控制器地址 | 用户在屏幕上点选后回传 |
+| `0x3200` | 备注写入暂存区 | 写入 NorFlash 前的中转缓冲区 |
+| `0x3220` | 备注读回暂存区 | 从 NorFlash 读回后的中转缓冲区 |
+
+### API 速查
+
+```c
+/* 核心发送 API（自动入队发送队列，不阻塞） */
+void DWIN_WriteVar(uint16_t addr, const uint8_t *pData, uint8_t data_len);
+void DWIN_ReadVar(uint16_t addr, uint8_t word_cnt);
+void DWIN_NorFlashWrite(uint32_t flash_addr, uint16_t var_addr, uint16_t word_len);
+void DWIN_NorFlashRead(uint32_t flash_addr, uint16_t var_addr, uint16_t word_len);
+void DWIN_ReadRTC(void);
+void DWIN_WriteAlarmRecord(const DWIN_RTC_t *rtc, uint8_t ctrlAddr, uint8_t sensorIdx);
+uint16_t DWIN_CalcCRC16(const uint8_t *pData, uint16_t len);
+
+/* 队列与信号量（外部访问） */
+extern QueueHandle_t     xDwinTxQueue;
+extern QueueHandle_t     xDwinRxQueue;
+extern SemaphoreHandle_t xDwinTxCompleteSem;
+
+/* 接收任务解析状态 */
+extern DWIN_HostStatus_t g_hostDwinStatus;
+```
+
+### 图标值定义
+
+| 值 | 含义 |
+|----|------|
+| `DWIN_ICON_ALARM` (0x0003) | 在线且报警 |
+| `DWIN_ICON_TROUBLE` (0x0002) | 在线且故障 |
+| `DWIN_ICON_NORMAL` (0x0001) | 在线且正常 |
+| `DWIN_ICON_OFFLINE` (0x0000) | 离线 |
 
 ## Controlboard UART2 从站任务（新增）
 
@@ -516,17 +689,36 @@ ModbusMaster_EnqueueRequest(&req);
 ## Hostboard 构建与烧录
 
 ```bash
-# 首次配置
-cd Hostboard && cmake -B build/Debug
+# 首次配置（必须从 Hostboard 目录执行）
+cd Hostboard && cmake --preset Debug
 
-# 编译
-cmake --build build/Debug
+# 编译（必须从 Hostboard 目录执行）
+cmake --build --preset Debug          # 或 cmake --build build/Debug
 
 # 输出文件
 build/Debug/Hostboard.elf
 ```
 
-Hostboard 没有 flash.sh 脚本，烧录请直接使用 OpenOCD 或 STM32CubeProgrammer。
+### 烧录（需连接 ST-LINK/V2）
+
+Hostboard 没有 flash.sh 脚本，直接使用 OpenOCD：
+
+```bash
+openocd -f interface/stlink-v2.cfg -f target/stm32f4x.cfg -c "program build/Debug/Hostboard.elf verify reset exit"
+```
+
+### 调试（终端 GDB）
+
+```bash
+# 终端 1：OpenOCD GDB 服务器
+openocd -f interface/stlink-v2.cfg -f target/stm32f4x.cfg -c "gdb_port 3333"
+
+# 终端 2：arm-none-eabi-gdb
+arm-none-eabi-gdb build/Debug/Hostboard.elf
+(gdb) target remote :3333
+(gdb) load
+(gdb) monitor reset halt
+```
 
 ## Controlboard 构建与烧录
 
@@ -634,6 +826,10 @@ arm-none-eabi-gdb build/Debug/Controlboard.elf
 | UART2 从站过滤 | 仅响应本机 DIP 地址 | `slave_addr == ModbusReg_GetBoardAddr()` |
 | USART1 TX 完成超时 | 50ms | 中断发送等 TX 完成信号量 |
 | UART2 TX 完成超时 | 200ms | 从站发送等 TX 完成信号量（大帧 130 字节 @ 9600 ≈ 135ms） |
+| USART3 DWIN TX 完成超时 | 50ms | TaskDwinTx 等待 xDwinTxCompleteSem |
+| DWIN 帧最大长度 | 128 字节 | DwinFrame_t.data 缓冲区上限 |
+| DWIN 接收队列深度 | 4 帧 | xDwinRxQueue 最大排队数 |
+| **Hostboard DWIN 图标更新** | **每 500ms** | **TaskDwinIcons 更新 5 帧：4 帧控制器图标 + 1 帧系统状态图标** |
 
 ## 风压传感器固件架构
 
@@ -792,6 +988,7 @@ if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_ORE))
 | Controlboard USART1 (master) | `xModbusTxCompleteSem` | 50ms | `dwin.c` → `HAL_UART_TxCpltCallback` |
 | Controlboard UART2 (slave) | `xSlaveTxCompleteSem` | 200ms | `dwin.c` → `HAL_UART_TxCpltCallback` |
 | Hostboard USART1 (master) | `xMasterTxCompleteSem` | 50ms | `modbus_callbacks.c` → `HAL_UART_TxCpltCallback` |
+| Hostboard USART3 (DWIN) | `xDwinTxCompleteSem` | 50ms | `modbus_callbacks.c` → `HAL_UART_TxCpltCallback` |
 
 ### 64 位线圈寄存器跨任务保护
 
@@ -804,3 +1001,38 @@ if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_ORE))
 ### ORE 中断重置 rx_index
 
 USART1 和 USART2 的 ORE（溢出错误）中断处理中增加了 `ModbusMaster_ResetRx()` / `ModbusSlave_ResetRx()` 调用，将接收缓冲区索引 `rx_index` 清零。防止 ORE 导致字节丢失后，后续字节与旧帧残余拼接成错误帧。受影响的 ISR：`stm32f0xx_it.c` → `USART1_IRQHandler`、`USART2_IRQHandler`。
+
+### FE/NE/PE → TXE 中断风暴（中断发送专用）
+
+**影响范围：** Controlboard USART1/USART2 + Hostboard USART1/USART3
+
+**根因：** 将 `HAL_UART_Transmit()` 阻塞发送改为 `HAL_UART_Transmit_IT()` 中断发送后启用 TXEIE。`HAL_UART_IRQHandler` 检测到 `errorflags != 0`（FE/NE/PE 置位）且 RXNEIE 使能时，进入错误分支**提前 return**，永不处理 TXE 分支 → TXEIE 永不关闭 → 无限 TXE 中断风暴 → 发送卡死。
+
+**修复：** 在调用 `HAL_UART_IRQHandler()` 之前，手动写 ICR（F0）/ SR（F4）清除 FE/NE/PE：
+
+```c
+/* Controlboard (stm32f0xx_it.c) — F0 系列写 ICR */
+if (huart1.Instance->ISR & (USART_ISR_FE | USART_ISR_NE | USART_ISR_PE))
+{
+    __HAL_UART_CLEAR_FEFLAG(&huart1);
+    __HAL_UART_CLEAR_NEFLAG(&huart1);
+    __HAL_UART_CLEAR_PEFLAG(&huart1);
+    ModbusMaster_ResetRx();
+}
+
+/* Hostboard (stm32f4xx_it.c) — F4 系列写 SR，语义相同 */
+if (huart1.Instance->SR & (USART_SR_FE | USART_SR_NE | USART_SR_PE))
+{
+    __HAL_UART_CLEAR_FEFLAG(&huart1);
+    __HAL_UART_CLEAR_NEFLAG(&huart1);
+    __HAL_UART_CLEAR_PEFLAG(&huart1);
+    ModbusMaster_ResetRx();
+}
+```
+
+与 ORE 相同模式——所有 UART 错误标志（ORE/FE/NE/PE）都必须在 HAL 处理之前自行清除。
+
+**受影响文件：**
+- `Controlboard/Core/Src/stm32f0xx_it.c` — USART1_IRQHandler、USART2_IRQHandler
+- `Hostboard/Core/Src/stm32f4xx_it.c` — USART1_IRQHandler、USART3_IRQHandler
+- `Hostboard/Core/Src/uart1_modbus_master.c` — 新增 `ModbusMaster_ResetRx()`

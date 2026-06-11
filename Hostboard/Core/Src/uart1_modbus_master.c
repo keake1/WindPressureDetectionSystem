@@ -99,6 +99,17 @@ void ModbusMaster_InitQueues(void)
         xMasterTxCompleteSem = xSemaphoreCreateBinary();
 }
 
+/* ==================== 复位接收缓冲 ==================== */
+
+/**
+  * @brief  复位接收缓冲区索引
+  * @note   在 ORE/FE/NE/PE 等错误导致数据不可靠时调用。
+  */
+void ModbusMaster_ResetRx(void)
+{
+    rx_index = 0;
+}
+
 /* ==================== 中断接收控制 ==================== */
 
 /**

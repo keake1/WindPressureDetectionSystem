@@ -237,6 +237,19 @@ void USART1_IRQHandler(void)
   if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_ORE))
   {
       __HAL_UART_CLEAR_OREFLAG(&huart1);
+      ModbusMaster_ResetRx();
+  }
+
+  /* ---- FE/NE/PE：帧/噪声/校验错误，必须写 SR 清除 ----
+   * HAL_UART_IRQHandler 检测到 errorflags != 0 且 RXNEIE 使能时
+   * 会走错误分支提前 return，永远到不了 TXE 处理分支 →
+   * TXEIE 无人关闭 → 中断风暴、中断发送永久卡死。 */
+  if (huart1.Instance->SR & (USART_SR_FE | USART_SR_NE | USART_SR_PE))
+  {
+      __HAL_UART_CLEAR_FEFLAG(&huart1);
+      __HAL_UART_CLEAR_NEFLAG(&huart1);
+      __HAL_UART_CLEAR_PEFLAG(&huart1);
+      ModbusMaster_ResetRx();
   }
 
   /* USER CODE END USART1_IRQn 0 */
@@ -278,6 +291,15 @@ void USART3_IRQHandler(void)
   if (__HAL_UART_GET_FLAG(&huart3, UART_FLAG_ORE))
   {
       __HAL_UART_CLEAR_OREFLAG(&huart3);
+      DwinRxReset();
+  }
+
+  /* ---- FE/NE/PE：同 USART1，防止 HAL 错误分支导致 TXE 中断风暴 ---- */
+  if (huart3.Instance->SR & (USART_SR_FE | USART_SR_NE | USART_SR_PE))
+  {
+      __HAL_UART_CLEAR_FEFLAG(&huart3);
+      __HAL_UART_CLEAR_NEFLAG(&huart3);
+      __HAL_UART_CLEAR_PEFLAG(&huart3);
       DwinRxReset();
   }
 

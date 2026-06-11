@@ -147,7 +147,7 @@ int main(void)
   ModbusSlave_InitQueues();
 
   /* ---- 创建 UART2 从站接收任务 ---- */
-  xTaskCreate(TaskSlaveRecv, "SlaveRecv", 128, NULL, 2, NULL);
+  xTaskCreate(TaskSlaveRecv, "SlaveRecv", 256, NULL, 2, NULL);
 
   /* ---- 创建 UART2 从站发送任务 ---- */
   xTaskCreate(TaskSlaveSend, "SlaveSend", 128, NULL, 2, NULL);

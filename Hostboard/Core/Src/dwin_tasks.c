@@ -20,6 +20,7 @@
 #include "dwin_tasks.h"
 #include "dwin.h"
 #include "usart.h"
+#include "hostboard_registers.h"
 #include <string.h>
 
 /* USER CODE BEGIN 0 */
@@ -33,6 +34,42 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+/* ==================== 图标计算辅助函数 ==================== */
+
+static uint16_t HostCalcCtrlIcon(uint8_t addr)
+{
+    if (!HostReg_IsOnline(addr))
+        return DWIN_ICON_OFFLINE;
+
+    if (HostReg_GetCoilBit(addr, COIL_OFFSET_ZERO_ADDR) ||
+        HostReg_GetCoilBit(addr, COIL_OFFSET_ADDR_CONF))
+        return DWIN_ICON_TROUBLE;
+
+    if (HostReg_GetCoilBit(addr, COIL_GLOBAL_ALARM))
+        return DWIN_ICON_ALARM;
+
+    return DWIN_ICON_NORMAL;
+}
+
+static uint16_t HostCalcSysIcon(void)
+{
+    if (HostReg_GetAddrConflict())
+        return 3;
+
+    if (HostReg_GetZeroAddrPresent())
+        return 2;
+
+    for (uint16_t addr = 1; addr <= MAX_CTRLBD_ADDR; addr++)
+    {
+        if (HostReg_IsOnline((uint8_t)addr) &&
+            HostReg_GetCoilBit((uint8_t)addr, COIL_GLOBAL_ALARM))
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
 
 /* ==================== USART3 发送任务 ==================== */
 
@@ -182,6 +219,42 @@ void TaskDwinRx(void *arg)
             g_hostDwinStatus.rtcSecond = buf[13];
             g_hostDwinStatus.rtcReady  = 1U;
         }
+    }
+}
+
+/* ==================== 迪文屏图标更新任务（每 500ms） ==================== */
+
+void TaskDwinIcons(void *arg)
+{
+    (void)arg;
+    uint8_t buf[64];   /* 32 icons × 2 bytes = 64 字节 */
+
+    for (;;)
+    {
+        /* ---- 帧 1~4：控制器图标，每帧 32 个 ---- */
+        for (uint8_t frame = 0; frame < 4; frame++)
+        {
+            uint16_t base_addr  = DWIN_CTRL_ICON_BASE_ADDR + (uint16_t)frame * DWIN_ICONS_PER_FRAME;
+            uint8_t  base_slave = frame * DWIN_ICONS_PER_FRAME + 1;
+
+            for (uint8_t i = 0; i < DWIN_ICONS_PER_FRAME; i++)
+            {
+                uint16_t icon = HostCalcCtrlIcon(base_slave + i);
+                buf[i * 2]     = (uint8_t)(icon >> 8);
+                buf[i * 2 + 1] = (uint8_t)(icon & 0xFF);
+            }
+
+            DWIN_WriteVar(base_addr, buf, DWIN_ICONS_PER_FRAME * 2);
+        }
+
+        /* ---- 帧 5：系统状态图标（地址 0x1881，1 个 word） ---- */
+        uint16_t sys_icon = HostCalcSysIcon();
+        buf[0] = (uint8_t)(sys_icon >> 8);
+        buf[1] = (uint8_t)(sys_icon & 0xFF);
+        DWIN_WriteVar(DWIN_HOST_STATUS_ICON_ADDR, buf, 2);
+
+        /* ---- 等待 500ms 进入下一轮 ---- */
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 

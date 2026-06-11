@@ -191,6 +191,20 @@ void USART1_IRQHandler(void)
       ModbusMaster_ResetRx();
   }
 
+  /* ---- FE/NE/PE：帧/噪声/校验错误，必须写 ICR 清除 ----
+   * 关键：EIE 未使能时 HAL 不会清除这些标志，但 HAL_UART_IRQHandler
+   * 检测到 errorflags != 0 且 RXNEIE 使能时会走错误分支提前 return，
+   * 永远到不了 TXE 处理分支 → TXEIE 无人关闭 → 中断风暴、
+   * 中断发送（HAL_UART_Transmit_IT）永久卡死。 */
+  if (huart1.Instance->ISR & (USART_ISR_FE | USART_ISR_NE | USART_ISR_PE))
+  {
+      __HAL_UART_CLEAR_FEFLAG(&huart1);
+      __HAL_UART_CLEAR_NEFLAG(&huart1);
+      __HAL_UART_CLEAR_PEFLAG(&huart1);
+      /* 错误帧数据不可靠，丢弃当前接收缓冲 */
+      ModbusMaster_ResetRx();
+  }
+
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
@@ -225,6 +239,15 @@ void USART2_IRQHandler(void)
   if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_ORE))
   {
       __HAL_UART_CLEAR_OREFLAG(&huart2);
+      ModbusSlave_ResetRx();
+  }
+
+  /* ---- FE/NE/PE：同 USART1，防止 HAL 错误分支导致 TXE 中断风暴 ---- */
+  if (huart2.Instance->ISR & (USART_ISR_FE | USART_ISR_NE | USART_ISR_PE))
+  {
+      __HAL_UART_CLEAR_FEFLAG(&huart2);
+      __HAL_UART_CLEAR_NEFLAG(&huart2);
+      __HAL_UART_CLEAR_PEFLAG(&huart2);
       ModbusSlave_ResetRx();
   }
 

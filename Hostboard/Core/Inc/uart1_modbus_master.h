@@ -95,6 +95,7 @@ extern HostboardLastReq_t g_host_last_req;         /* 当前在飞的请求信�
 /* Exported functions prototypes ---------------------------------------------*/
 
 void     ModbusMaster_InitQueues(void);
+void     ModbusMaster_ResetRx(void);
 void     ModbusMaster_StartRx(void);
 void     ModbusMaster_DisableRx(void);
 void     ModbusMaster_RxByteHandler(uint8_t data);
