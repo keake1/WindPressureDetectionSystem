@@ -26,10 +26,6 @@
 
 /* DWIN 变量区：写 NorFlash 前的数据中转缓冲区 */
 #define DWIN_TIP_VAR_ADDR           0x1000U  
-#define DWIN_SENSOR_STATUS_ICON_ADDR    0x1E24U  /* 传感器状态图标区 */
-#define DWIN_SENSOR_NUM_ICON_ADDR   0x2000U
-#define DWIN_SENSOR_DATA_ADDR       0x2100U  /* 传感器数据区（屏幕读回后存放处） */
-#define DWIN_SELECT_CTRL_ADDR       0x4000U  
 #define DWIN_TIP_WRITE_BUF_ADDR     0X3200U	 /* 备注写入暂存区（发往 NorFlash 前） */
 #define DWIN_TIP_READ_BUF_ADDR      0x3220U  /* 备注读回暂存区（从 NorFlash 读回后） */
 
@@ -45,7 +41,7 @@
 #define DWIN_TIP_CONTENT_MAX_LEN    30U
 
 /* 备注槽位总数（根据实际迪文屏工程中备注变量数量填写） */
-#define DWIN_TIP_SLOT_COUNT         200U
+#define DWIN_TIP_SLOT_COUNT         128U
 
 /* NorFlash 地址计算宏：由 slot 索引（0起）得到对应的 NorFlash 字地址 */
 #define DWIN_TIP_FLASH_ADDR(slot)   (DWIN_TIP_FLASH_BASE + (uint32_t)(slot) * DWIN_TIP_WORDS_PER_SLOT)
@@ -89,14 +85,14 @@ void DWIN_NorFlashWrite(uint32_t flash_addr, uint16_t var_addr, uint16_t word_le
 void DWIN_NorFlashRead(uint32_t flash_addr, uint16_t var_addr, uint16_t word_len);
 
 /* 控制器状态图标变量区
- *   地址范围：0x2100 ~ 0x217F，共 128 个 word，下标 = 控制器地址 - 1
+ *   地址范围：0x1800 ~ 0x187F，共 128 个 word，下标 = 控制器地址 - 1
  *   图标值定义：
  *     0x0000 = 在线且报警（红色告警图标）
  *     0x0001 = 保留
  *     0x0002 = 离线（灰色图标）
  *     0x0003 = 在线且正常（绿色图标）*/
-#define DWIN_CTRL_ICON_BASE_ADDR    0x1D00U  /* 控制器状态图标区起始地址 */
-#define DWIN_CTRL_ICON_COUNT        200U  /* 图标数量，对应地址 1~200 */
+#define DWIN_CTRL_ICON_BASE_ADDR    0x1800U  /* 控制器状态图标区起始地址 */
+#define DWIN_CTRL_ICON_COUNT        128U  /* 图标数量，对应地址 1~128 */
 
 /* USER CODE BEGIN ET */
 
@@ -108,22 +104,44 @@ typedef struct {
     uint16_t length;       /* 帧长度（字节数） */
 } DwinFrame_t;
 
+/**
+ * @brief  Hostboard 端 DWIN 屏解析状态（接收任务填充）
+ */
+typedef struct {
+    /* RTC 时间（地址 0x0010 读回） */
+    uint8_t rtcYear;
+    uint8_t rtcMonth;
+    uint8_t rtcDay;
+    uint8_t rtcHour;
+    uint8_t rtcMinute;
+    uint8_t rtcSecond;
+    uint8_t rtcReady;       /* 1 = RTC 已读回有效数据 */
+
+    /* 屏幕选中的控制器地址（地址 0x4000 读回） */
+    uint8_t selectAddr;
+} DWIN_HostStatus_t;
+
 /* USER CODE END ET */
 
-#define DWIN_ICON_ALARM             0x0004U  /* 在线且报警 */
-#define DWIN_ICON_TROUBLE           0x0003U  /* 在线且故障 */
-#define DWIN_ICON_NORMAL            0x0002U  /* 在线且正常 */
-#define DWIN_ICON_OFFLINE           0x0001U  /* 离线 */
+#define DWIN_ICON_ALARM             0x0003U  /* 在线且报警 */
+#define DWIN_ICON_TROUBLE           0x0002U  /* 在线且故障 */
+#define DWIN_ICON_NORMAL            0x0001U  /* 在线且正常 */
+#define DWIN_ICON_OFFLINE           0x0000U  /* 离线 */
 
 /* 报警记录显示区
  *   起始地址 0x2000，每条记录占 4 个 word（8 字节）
  *   字节布局：[年(1)] [月(1)] [日(1)] [时(1)] [分(1)] [秒(1)] [控制器地址(1)] [保留(1)]
  *   最多 12 条，地址依次为 0x2000 / 0x2004 / ... / 0x202C，满后循环覆盖 */
-#define DWIN_ALARM_BASE_ADDR        0x1DD0U  /* 报警记录区起始地址 */
+#define DWIN_ALARM_BASE_ADDR        0x2000U  /* 报警记录区起始地址 */
 #define DWIN_ALARM_RECORD_WORDS     4U       /* 每条记录占 4 个 word（8 字节）*/
 #define DWIN_ALARM_MAX_RECORDS      12U      /* 最多保存 12 条 */
 
 /* USER CODE BEGIN EConst */
+
+#define DWIN_SENSOR_STATUS_ICON_ADDR    0x1890U /* 传感器状态图标区（对应控制器状态图标区的后半部分，地址 129~192）*/
+#define DWIN_SENSOR_DATA_ADDR       0x1900U  /* 传感器数据区（屏幕读回后存放处） */
+#define SEWNSOR_NUM_PER_CTRL              64U       /* 每个控制器的传感器数量（对应图标数量）*/
+#define DWIN_SELECT_CTRL_ADDR       0x3100U  /* 屏幕选中控制器地址 */
 
 /* ==================== USART3 迪文屏队列参数 ==================== */
 #define DWIN_TX_FRAME_MAX   128
@@ -203,6 +221,9 @@ void UART3_Send(const uint8_t *buf, uint16_t len);
 void DwinRxByteHandler(uint8_t data);
 void DwinRxReset(void);
 void Dwin_InitQueues(void);
+
+/* ==================== 读应答解析状态 ==================== */
+extern DWIN_HostStatus_t g_hostDwinStatus;
 
 /* USER CODE END EFP */
 

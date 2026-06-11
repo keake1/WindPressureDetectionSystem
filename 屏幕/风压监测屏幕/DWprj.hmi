@@ -2,7 +2,7 @@
 PICFIX=1
 VARCount=64
 Version=0
-ProVersion=648
+ProVersion=650
 SCREENDSIZE=800X480
 SPADDRESS=5000
 [IMG]

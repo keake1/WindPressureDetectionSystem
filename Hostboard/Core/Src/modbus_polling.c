@@ -22,7 +22,7 @@
 #include "modbus_polling.h"
 #include "uart1_modbus_master.h"
 #include "hostboard_registers.h"
-
+#include "dwin.h"
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
@@ -45,6 +45,19 @@ void TaskModbusPoll(void *arg)
     uint16_t online_idx    = 1;       /* 在线控制器扫描起始 */
     uint8_t  do_online     = 0;       /* 本次是否穿插在线 */
 
+    for (uint16_t slot = 0U; slot < DWIN_TIP_SLOT_COUNT; slot++)
+    {
+        uint32_t flash_addr = DWIN_TIP_FLASH_ADDR(slot);
+
+        /* 步骤1：从 NorFlash 读到变量暂存区 */
+        DWIN_NorFlashRead(flash_addr, DWIN_TIP_READ_BUF_ADDR, DWIN_TIP_WORDS_PER_SLOT);
+        vTaskDelay(pdMS_TO_TICKS(50U));
+
+        /* 步骤2：发 0x83 读取变量暂存区，触发屏幕返回数据 */
+        DWIN_ReadVar(DWIN_TIP_READ_BUF_ADDR, (uint8_t)DWIN_TIP_WORDS_PER_SLOT);
+        vTaskDelay(pdMS_TO_TICKS(50U));
+    }
+    
     for (;;)
     {
         /* ---- 轮询间隔 50ms ---- */
