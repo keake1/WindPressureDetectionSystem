@@ -15,6 +15,7 @@
 #include "usart.h"
 
 /* USER CODE BEGIN 0 */
+#include "dwin.h"
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
@@ -22,6 +23,13 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
     {
         BaseType_t xWoken = pdFALSE;
         xSemaphoreGiveFromISR(xMasterTxCompleteSem, &xWoken);
+        portYIELD_FROM_ISR(xWoken);
+    }
+    /* ---- USART3 迪文屏 TX 完成 ---- */
+    else if (huart == &huart3)
+    {
+        BaseType_t xWoken = pdFALSE;
+        xSemaphoreGiveFromISR(xDwinTxCompleteSem, &xWoken);
         portYIELD_FROM_ISR(xWoken);
     }
 }

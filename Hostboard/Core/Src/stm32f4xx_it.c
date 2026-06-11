@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "uart1_modbus_master.h"
+#include "dwin.h"       /* 新增 */
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -265,6 +266,20 @@ void USART2_IRQHandler(void)
 void USART3_IRQHandler(void)
 {
   /* USER CODE BEGIN USART3_IRQn 0 */
+
+  /* ---- RXNE：收到一个字节，送入迪文屏状态机 ---- */
+  if (__HAL_UART_GET_FLAG(&huart3, UART_FLAG_RXNE))
+  {
+      uint8_t data = (uint8_t)(huart3.Instance->DR & 0xFF);
+      DwinRxByteHandler(data);
+  }
+
+  /* ---- ORE：溢出错误，清标志 + 重置 RX 状态机 ---- */
+  if (__HAL_UART_GET_FLAG(&huart3, UART_FLAG_ORE))
+  {
+      __HAL_UART_CLEAR_OREFLAG(&huart3);
+      DwinRxReset();
+  }
 
   /* USER CODE END USART3_IRQn 0 */
   HAL_UART_IRQHandler(&huart3);

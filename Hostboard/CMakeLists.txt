@@ -45,6 +45,8 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/dwin.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/dwin_tasks.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/freertos_hooks.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hostboard_registers.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/uart1_modbus_master.c
