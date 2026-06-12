@@ -49,6 +49,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/dwin_tasks.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/freertos_hooks.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hostboard_registers.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/detail_view_data.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/uart1_modbus_master.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/modbus_master_tasks.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/modbus_polling.c

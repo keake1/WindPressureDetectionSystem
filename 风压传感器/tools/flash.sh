@@ -89,7 +89,7 @@ echo "开始烧录 ..."
 echo "提示: 请在提示 \"Power cycle the MCU\" 时，"
 echo "      断开目标板电源后重新上电。"
 echo ""
-python -m stcgal -p "$PORT" -P auto "$FILE"
+python -m stcgal -p "$PORT" -P auto -t 11059 "$FILE"
 
 echo ""
 echo "烧录完成。"

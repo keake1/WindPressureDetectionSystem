@@ -144,6 +144,14 @@ typedef struct {
 #define SEWNSOR_NUM_PER_CTRL              64U       /* 每个控制器的传感器数量（对应图标数量）*/
 #define DWIN_SELECT_CTRL_ADDR       0x3100U  /* 屏幕选中控制器地址 */
 
+/* 详情界面常量 */
+#define DWIN_DETAIL_WIN_ICON_ADDR      0x1882U  /* 窗状态（选中控制器） */
+#define DWIN_DETAIL_GLB_ALARM_ADDR      0x1883U  /* 全局报警 */
+#define DWIN_DETAIL_ZERO_ADDR_ADDR      0x1884U  /* 零地址存在 */
+#define DWIN_DETAIL_CONF_ADDR_ADDR      0x1885U  /* 地址重复 */
+#define DWIN_DETAIL_SENSOR_ICON_ADDR    0x1890U  /* 传感器图标起始（63 个 word） */
+#define DWIN_DETAIL_SENSOR_DATA_ADDR    0x1900U  /* 传感器数据起始（每传感器 16 地址） */
+
 /* ==================== USART3 迪文屏队列参数 ==================== */
 #define DWIN_TX_FRAME_MAX   128
 #define DWIN_RX_FRAME_MAX   128

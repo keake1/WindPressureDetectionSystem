@@ -14,22 +14,31 @@ static uint16_t Uart_Reload(uint32_t baud)
 
 void Uart_Init(void)
 {
-    uint16_t reload1 = Uart_Reload(PRESSURE_BAUD);
-    uint16_t reload2 = Uart_Reload(CONTROLLER_BAUD);
+    /*
+     * 波特率发生器分配：
+     *   UART1（气压模块，115200）→ Timer 1（8-bit auto-reload, SMOD=1）
+     *   UART2（Modbus，9600）      → Timer 2（1T mode, 16-bit reload）
+     *
+     * STC8H1K28 的 UART2 固定使用 Timer 2 作为波特率发生器，
+     * 因此 UART1 必须让出 Timer 2，改由 Timer 1 驱动。
+     */
+    uint16_t reload2 = Uart_Reload(CONTROLLER_BAUD);  // 9600 重装值
 
     P_SW1 &= 0x3FU; /* UART1 on P30/RXD and P31/TXD. */
     SCON = SCON_MODE1 | SCON_REN;
     S2CON = S2CON_REN;
 
-    /*
-     * Timer2 drives UART1 baud on common STC8H configurations.
-     * UART2 baud generator differs between STC subfamilies; the reload2
-     * calculation is kept here to make the intended value explicit.
-     */
-    (void)reload2;
-    T2H = (uint8_t)(reload1 >> 8);
-    T2L = (uint8_t)reload1;
-    AUXR = 0x15U; /* Official STC setup: T2 1T + T2 run + UART1 uses Timer2. */
+    /* ---- Timer 1 → UART1 @ 115200 ---- */
+    TMOD = (TMOD & 0x0FU) | 0x20U;            // Timer 1, 8-bit auto-reload (mode 2)
+    TH1 = (uint8_t)(256U - (FOSC_HZ / 32U / PRESSURE_BAUD));
+    PCON |= 0x80U;                             // SMOD = 1（倍频）
+    TL1 = TH1;                                 // 初值与重装值一致
+    TCON |= 0x40U;                             // TR1 = 1：启动 Timer 1
+
+    /* ---- Timer 2 → UART2 @ 9600 ---- */
+    T2H = (uint8_t)(reload2 >> 8);             // 0xFE
+    T2L = (uint8_t)reload2;                     // 0xE0
+    AUXR = (AUXR & (uint8_t)~0x01U) | 0x14U;   // S1ST2=0（UART1→T1）, T2R=1, T2x12=1
 
     SCON &= (uint8_t)~(SCON_RI | SCON_TI);
     S2CON &= (uint8_t)~(S2CON_RI | S2CON_TI);

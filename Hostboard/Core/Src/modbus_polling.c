@@ -23,7 +23,22 @@
 #include "uart1_modbus_master.h"
 #include "hostboard_registers.h"
 #include "dwin.h"
+#include "detail_view_data.h"
 /* USER CODE BEGIN 0 */
+
+/* ==================== 详情采集状态机 ==================== */
+
+typedef enum {
+    DETAIL_IDLE       = 0,  /* selectAddr == 0，不执行 */
+    DETAIL_NEED_COIL  = 1,  /* 需要读选中控制器的全量线圈 */
+    DETAIL_NEXT_TYPE  = 2,  /* 读下一个在线传感器的型号 */
+    DETAIL_NEXT_DATA  = 3,  /* 读下一个在线传感器的数据 */
+} DetailState_t;
+
+static uint8_t  s_detail_poll_interval;  /* 插队间隔计数器 */
+static uint8_t  s_detail_state;          /* 采集阶段 */
+static uint8_t  s_detail_next;           /* 下一个要采集的传感器索引 (1-63) */
+static uint8_t  s_detail_last_addr;      /* 上次采集的控制器地址，用于检测切换 */
 
 /* USER CODE END 0 */
 
@@ -35,7 +50,111 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-/* ==================== 轮询任务（8+1 穿插） ==================== */
+/* ==================== 详情采集静态函数 ==================== */
+
+/**
+  * @brief  详情采集状态机一步，由轮询任务每 3 次调用一次
+  * @param  selectAddr  当前屏幕选中的控制器地址（0 = 未选中）
+  */
+static void DetailCollect_Step(uint8_t selectAddr)
+{
+    /* 检测选中控制器切换 → 重置 */
+    if (selectAddr != s_detail_last_addr)
+    {
+        DetailView_Reset();
+        s_detail_state = DETAIL_NEED_COIL;
+        s_detail_next = 1;
+        s_detail_last_addr = selectAddr;
+    }
+
+    switch (s_detail_state)
+    {
+        case DETAIL_IDLE:
+            if (selectAddr != 0)
+            {
+                s_detail_state = DETAIL_NEED_COIL;
+                s_detail_next = 1;
+                DetailView_Reset();
+                s_detail_last_addr = selectAddr;
+            }
+            break;
+
+        case DETAIL_NEED_COIL:
+            /* 离线控制器 → 跳过采集（等下次唤醒） */
+            if (!HostReg_IsOnline(selectAddr))
+                break;
+            if (!DetailView_IsCoilReady(selectAddr))
+            {
+                ModbusMasterRequest_t req = {
+                    .slave_addr = selectAddr,
+                    .func_code  = MODBUS_FUNC_READ_DISCRETE_INPUTS,
+                    .reg_addr   = 0,
+                    .reg_value  = 130
+                };
+                ModbusMaster_EnqueueRequest(&req);
+            }
+            else
+            {
+                s_detail_state = DETAIL_NEXT_TYPE;
+            }
+            break;
+
+        case DETAIL_NEXT_TYPE:
+        {
+            while (s_detail_next <= 63)
+            {
+                if (HostReg_GetCoilBit(selectAddr, (uint16_t)(s_detail_next - 1)))
+                {
+                    if (DetailView_GetType(s_detail_next) == 0)
+                    {
+                        ModbusMasterRequest_t req = {
+                            .slave_addr = selectAddr,
+                            .func_code  = MODBUS_FUNC_READ_HOLDING_REGISTERS,
+                            .reg_addr   = s_detail_next,
+                            .reg_value  = 1
+                        };
+                        ModbusMaster_EnqueueRequest(&req);
+                        s_detail_state = DETAIL_NEXT_DATA;
+                        return;
+                    }
+                }
+                s_detail_next++;
+            }
+            s_detail_next = 1;
+            /* 全轮采集完成 → 清缓存重新开始，实现持续刷新 */
+            DetailView_Reset();
+            s_detail_last_addr = selectAddr;
+            s_detail_state = DETAIL_NEED_COIL;
+            break;
+        }
+
+        case DETAIL_NEXT_DATA:
+        {
+            uint8_t n = s_detail_next;
+            if (DetailView_GetType(n) != 0)
+            {
+                ModbusMasterRequest_t req = {
+                    .slave_addr = selectAddr,
+                    .func_code  = MODBUS_FUNC_READ_HOLDING_REGISTERS,
+                    .reg_addr   = 64 + (uint16_t)(n - 1) * 7,
+                    .reg_value  = 7
+                };
+                ModbusMaster_EnqueueRequest(&req);
+                s_detail_next++;
+                s_detail_state = DETAIL_NEXT_TYPE;
+            }
+            else
+            {
+                /* 类型未就绪（可能响应丢失）→ 跳过，下轮重试 */
+                s_detail_next++;
+                s_detail_state = DETAIL_NEXT_TYPE;
+            }
+            break;
+        }
+    }
+}
+
+/* ==================== 轮询任务（8+1 穿插 + 详情插队） ==================== */
 
 void TaskModbusPoll(void *arg)
 {
@@ -62,6 +181,15 @@ void TaskModbusPoll(void *arg)
     {
         /* ---- 轮询间隔 50ms ---- */
         vTaskDelay(pdMS_TO_TICKS(50));
+
+        /* ---- 详情采集插队：每 3 次轮询执行 1 次 ---- */
+        uint8_t selectAddr = g_hostDwinStatus.selectAddr;
+        if (selectAddr != 0 && ++s_detail_poll_interval >= 3)
+        {
+            s_detail_poll_interval = 0;
+            DetailCollect_Step(selectAddr);
+            continue;   /* 跳过本次常规轮询 */
+        }
 
         /* ---- 构造 FC 0x02 请求：读 3 bits（126-128） ---- */
         ModbusMasterRequest_t req;

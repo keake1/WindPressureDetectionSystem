@@ -54,6 +54,8 @@ WindPressureDetectionSystem/
 ├── 7合1传感器/          # 7合1空气质量传感器固件 (STC8H MCU), Keil μVision (Windows only)
 │   ├── hex文件/          # Keil 编译输出的 .hex 文件
 │   └── tools/            # Linux 烧录脚本 flash.sh（需 stcgal）
+├── scripts/              # 开发辅助脚本
+│   └── serial_monitor.py # 串口监听/Modbus轮询工具（Python, pyserial）
 └── 屏幕/                # 迪文屏 DGUS 工程 (DGUS 工具设计，仅 Windows)
     ├── 风压监测控制器屏幕/
     └── 风压监测屏幕/
@@ -82,6 +84,8 @@ WindPressureDetectionSystem/
 | 烧录 7合1传感器 | `cd 7合1传感器 && ./tools/flash.sh` |
 | 调试 Controlboard (GDB) | `cd Controlboard && arm-none-eabi-gdb build/Debug/Controlboard.elf -ex "target remote :3333" -ex "load"` |
 | 调试 Hostboard (GDB) | `cd Hostboard && arm-none-eabi-gdb build/Debug/Hostboard.elf -ex "target remote :3333" -ex "load"` |
+| 串口监听 9600 8N1 | `python3 scripts/serial_monitor.py /dev/ttyUSB0` |
+| 串口 Modbus 轮询 | `python3 scripts/serial_monitor.py /dev/ttyUSB0 --modbus-poll --slave 1` |
 
 ## Controlboard 外设
 
@@ -218,6 +222,7 @@ Hostboard（STM32F407VET6, 168MHz）是上位机/中继板，通过 PowerBus 二
 | `modbus_master_tasks.c/h` | FreeRTOS 任务层：发送任务（中断发送 + 等 TX 完成信号量 + 开/关接收窗口）、接收任务（CRC 校验 + 存储数据 + 释放信号量） |
 | `modbus_polling.c/h` | FreeRTOS 轮询任务：每 50ms 顺序扫描地址 0-128，FC 0x02 读 130 bits 离散输入 |
 | `hostboard_registers.c/h` | 寄存器模块：128 路 Controlboard 线圈数据存储 + 零地址/重复地址检测 |
+| `detail_view_data.c/h` | 详情界面存储模块：传感器类型缓存、线圈就绪标志、选中控制器切换重置 |
 | `dwin.c/h` | 迪文屏驱动：帧构建（0x82/0x83）、NorFlash 读写、RTC 读取、报警记录写入、CRC16 计算；队列初始化；ISR 驱动（状态机帧检测） |
 | `dwin_tasks.c/h` | USART3 迪文屏 FreeRTOS 收发任务：TaskDwinTx（队列→中断发送）、TaskDwinRx（0x83 应答解析：备注/地址/RTC） |
 | `modbus_callbacks.c` | HAL UART TX 完成回调（释放 `xMasterTxCompleteSem` / `xDwinTxCompleteSem`） |
@@ -495,6 +500,61 @@ extern DWIN_HostStatus_t g_hostDwinStatus;
 | `DWIN_ICON_TROUBLE` (0x0002) | 在线且故障 |
 | `DWIN_ICON_NORMAL` (0x0001) | 在线且正常 |
 | `DWIN_ICON_OFFLINE` (0x0000) | 离线 |
+
+### 详情界面 (Detail View)
+
+当用户在迪文屏上点选一个控制器（`selectAddr ≠ 0`）时，Hostboard 进入详情界面模式：
+
+**数据流：**
+```
+用户点击控制器 → selectAddr 更新
+  ↓
+TaskDwinIcons(每500ms) → 详情状态帧 + 传感器图标
+  ↓
+TaskModbusPoll(每3次轮询插1次) → DetailCollect_Step()
+  ├─ NEED_COIL:   FC 0x02 读选中控制器的全量线圈（130 bits）
+  ├─ NEXT_TYPE:   FC 0x03 读下一个在线传感器的型号（reg_addr = sensor_idx）
+  └─ NEXT_DATA:   FC 0x03 读传感器数据（reg_addr = 64 + (n-1)*7）
+  ↓
+TaskModbusRecv → DetailView_SetCoilReady() / SetType() / DetailPushToDwin()
+  ↓
+DWIN_WriteVar(0x1900+偏移) → 迪文屏显示传感器数值+图标
+```
+
+**详情界面 DWIN 变量区布局：**
+
+| 地址 | 内容 | 大小 |
+|------|------|------|
+| `0x1882` | 窗状态（开窗/关窗） | 1 word |
+| `0x1883` | 全局报警标志 | 1 word |
+| `0x1884` | 零地址存在 | 1 word |
+| `0x1885` | 地址重复标志 | 1 word |
+| `0x1890~0x18CE` | 63 个传感器图标 | 63 word（分 2 帧发送：32+31） |
+| `0x1900~0x19EF` | 传感器数据（每传感器 16 word） | 63 × 16 word |
+
+**传感器数据每 16 word 布局：**
+
+| 偏移(word) | 内容 | 类型 | 来源寄存器 |
+|-----------|------|------|-----------|
+| 0-1 | CO 值 | float ÷ 100 | regs[0] |
+| 2-3 | 风压值 | float | regs[0] |
+| 4 | 余压值 | uint16 | regs[0] |
+| 5 | eCO₂ | uint16 | regs[0] |
+| 6 | eCH₂O | uint16 | regs[1] |
+| 7 | TVOC | uint16 | regs[2] |
+| 8-9 | PM2.5 | float | regs[3] |
+| 10-11 | PM10 | float | regs[4] |
+| 12-13 | 温度 | float ÷ 10 | regs[5] |
+| 14-15 | 湿度 | float ÷ 10 | regs[6] |
+
+**存储模块 API (detail_view_data.c/h)：**
+```c
+void    DetailView_Reset(void);            // 切换控制器时清空缓存
+void    DetailView_SetType(sensor, type);  // 存储传感器型号
+uint8_t DetailView_GetType(sensor);        // 读取传感器型号
+void    DetailView_SetCoilReady(addr);     // 标记线圈已采集
+uint8_t DetailView_IsCoilReady(addr);      // 检查线圈是否就绪
+```
 
 ## Controlboard UART2 从站任务（新增）
 
@@ -841,6 +901,50 @@ arm-none-eabi-gdb build/Debug/Controlboard.elf
 - **控制器总线**: UART2 9600, Modbus RTU 从机，地址由 6-bit DIP 设定
 - **Modbus 协议**: 0x03 读返回风压值(型号 0x02)，0x06 写 0x0004 控制红灯
 
+### 模块文件
+
+| 文件 | 职责 |
+|------|------|
+| `main.c` | 主循环：UART1 轮询压力模块 + UART2 轮询 Modbus 帧 + 数码管扫描 + 心跳 LED |
+| `board.c/h` | 板级初始化：GPIO、LED、继电器、DIP 地址读取；`Board_DelayMs()` 粗略毫秒延时 |
+| `uart.c/h` | 双 UART 驱动：UART1 查询收发（气压模块 115200）+ UART2 查询收发（Modbus 9600） |
+| `sensor_modbus.c/h` | Modbus 从站处理：帧接收（字节累积+8字节触发）、CRC校验、0x03/0x06 功能码解析、响应发送 |
+| `crc16.c/h` | CRC-16 Modbus 校验（多项式 0x8005，初值 0xFFFF） |
+| `pressure.c/h` | 气压模块驱动：UART1 自定义 `0xFE`/`0xDC` 帧协议解析 |
+| `display.c/h` | 4 位数码管驱动：动态扫描、数值显示 |
+| `config.h` | 系统常量：时钟频率、波特率、传感器型号 ID |
+
+### UART 波特率发生器分配
+
+STC8H1K28 的 UART2 **固定使用 Timer 2** 作为波特率发生器，因此 UART1 必须让出 Timer 2：
+
+| UART | 波特率 | 定时器 | 模式 |
+|------|--------|--------|------|
+| UART1（气压模块） | 115200 | Timer 1 | 8-bit auto-reload, SMOD=1 |
+| UART2（Modbus） | 9600 | Timer 2 | 1T, 16-bit reload |
+
+关键配置：
+- **Timer 1**: `TMOD |= 0x20`（mode 2）, `TH1 = 0xFD`（SMOD=1 时 115200 精确值）
+- **Timer 2**: `T2H=0xFE, T2L=0xE0`（9600 @ 11.0592MHz 精确值 0xFEE0）
+- **AUXR**: `RTS2=0`（UART1→Timer 1）, `T2R=1, T2x12=1`
+
+### 主循环时序
+
+```c
+for (;;) {
+    Pressure_ProcessRx();                              // UART1 轮询气压模块
+    SensorModbus_Process(Board_ReadAddress(), ...);    // UART2 轮询 Modbus 请求
+    Display_SetValue(...);
+    Display_ScanOnce();
+    Board_DelayMs(1U);                                 // ~1ms 节拍
+    /* 每 500 次心跳翻转绿灯 */
+}
+```
+
+- **UART2 接收**：`SensorModbus_Process` 在 while 循环中耗尽 UART2 接收缓冲，字节累加至 8 字节后触发帧解析
+- **`Board_DelayMs(1U)`**：三层嵌套 for 循环忙等约 1ms，提供近似的毫秒级节拍（精确度依赖 IRC 校准）
+- **`SensorModbus_Init()`**：清空接收缓冲和状态，在 `Uart_Init()` 之后调用
+
 ### 构建与烧录
 
 ```bash
@@ -863,6 +967,10 @@ build/SensorBoard.hex
 ```
 
 烧录时在提示 `Power cycle the MCU` 处断开目标板电源后重新上电，STC 芯片特有流程。
+
+> **⚠️ 已知脚本问题（已修复）：**
+> - `build.sh` 曾有文件名 typo `main.cs` → 已改为 `main.c`
+> - `flash.sh` 已添加 `-t 11059`（IRC 校准），Windows `flash.ps1` 同样缺少此参数，需手动添加
 
 ### 7合1传感器烧录（Linux）
 
@@ -891,7 +999,7 @@ Protocol error: uncalibrated, please provide a trim value
 stcgal -p /dev/ttyUSB0 -b 115200 -t 11059 SensorBoard.hex
 ```
 
-两个传感器的 `flash.sh` 已内置默认 TRIM_KHZ=11059。若使用不同频率的 MCU，用 `-t` 覆盖：
+两个传感器的 `flash.sh` 已内置 `-t 11059`。Windows `flash.ps1` 暂未包含此参数（需手动添加）。若使用不同频率的 MCU，用 `-t` 覆盖：
 
 ```bash
 ./tools/flash.sh -p /dev/ttyUSB0 -t 22118   # 22.1184MHz

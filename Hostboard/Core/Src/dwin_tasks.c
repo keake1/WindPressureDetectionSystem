@@ -71,6 +71,17 @@ static uint16_t HostCalcSysIcon(void)
     return 0;
 }
 
+static uint16_t DetailSensorIcon(uint8_t selectAddr, uint8_t sensor_idx)
+{
+    if (!HostReg_GetCoilBit(selectAddr, sensor_idx - 1))
+        return DWIN_ICON_OFFLINE;
+
+    if (HostReg_GetCoilBit(selectAddr, COIL_OFFSET_ALARM + sensor_idx - 1))
+        return DWIN_ICON_ALARM;
+
+    return DWIN_ICON_NORMAL;
+}
+
 /* ==================== USART3 发送任务 ==================== */
 
 void TaskDwinTx(void *arg)
@@ -227,33 +238,81 @@ void TaskDwinRx(void *arg)
 void TaskDwinIcons(void *arg)
 {
     (void)arg;
-    uint8_t buf[64];   /* 32 icons × 2 bytes = 64 字节 */
+    uint8_t buf[64];
 
     for (;;)
     {
-        /* ---- 帧 1~4：控制器图标，每帧 32 个 ---- */
-        for (uint8_t frame = 0; frame < 4; frame++)
-        {
-            uint16_t base_addr  = DWIN_CTRL_ICON_BASE_ADDR + (uint16_t)frame * DWIN_ICONS_PER_FRAME;
-            uint8_t  base_slave = frame * DWIN_ICONS_PER_FRAME + 1;
+        uint8_t selectAddr = g_hostDwinStatus.selectAddr;
 
-            for (uint8_t i = 0; i < DWIN_ICONS_PER_FRAME; i++)
+        if (selectAddr == 0)
+        {
+            /* ===== 主界面模式（现有逻辑） ===== */
+            for (uint8_t frame = 0; frame < 4; frame++)
             {
-                uint16_t icon = HostCalcCtrlIcon(base_slave + i);
-                buf[i * 2]     = (uint8_t)(icon >> 8);
-                buf[i * 2 + 1] = (uint8_t)(icon & 0xFF);
+                uint16_t base_addr  = DWIN_CTRL_ICON_BASE_ADDR + (uint16_t)frame * DWIN_ICONS_PER_FRAME;
+                uint8_t  base_slave = frame * DWIN_ICONS_PER_FRAME + 1;
+
+                for (uint8_t i = 0; i < DWIN_ICONS_PER_FRAME; i++)
+                {
+                    uint16_t icon = HostCalcCtrlIcon(base_slave + i);
+                    buf[i * 2]     = (uint8_t)(icon >> 8);
+                    buf[i * 2 + 1] = (uint8_t)(icon & 0xFF);
+                }
+
+                DWIN_WriteVar(base_addr, buf, DWIN_ICONS_PER_FRAME * 2);
             }
 
-            DWIN_WriteVar(base_addr, buf, DWIN_ICONS_PER_FRAME * 2);
+            uint16_t sys_icon = HostCalcSysIcon();
+            buf[0] = (uint8_t)(sys_icon >> 8);
+            buf[1] = (uint8_t)(sys_icon & 0xFF);
+            DWIN_WriteVar(DWIN_HOST_STATUS_ICON_ADDR, buf, 2);
+        }
+        else
+        {
+            /* ===== 详情界面模式 ===== */
+
+            buf[0] = 0;
+
+            /* 帧 1：窗状态 0x1882 */
+            uint8_t win = HostReg_GetCoilBit(selectAddr, COIL_SMOKE_ALARM)
+                       || HostReg_GetCoilBit(selectAddr, COIL_GLOBAL_ALARM);
+            buf[1] = win ? 1 : 0;
+            DWIN_WriteVar(DWIN_DETAIL_WIN_ICON_ADDR, buf, 2);
+
+            /* 帧 2：全局报警 0x1883 */
+            buf[1] = HostReg_GetCoilBit(selectAddr, COIL_GLOBAL_ALARM) ? 1 : 0;
+            DWIN_WriteVar(DWIN_DETAIL_GLB_ALARM_ADDR, buf, 2);
+
+            /* 帧 3：零地址 0x1884 */
+            buf[1] = HostReg_GetCoilBit(selectAddr, COIL_OFFSET_ZERO_ADDR) ? 1 : 0;
+            DWIN_WriteVar(DWIN_DETAIL_ZERO_ADDR_ADDR, buf, 2);
+
+            /* 帧 4：重复地址 0x1885 */
+            buf[1] = HostReg_GetCoilBit(selectAddr, COIL_OFFSET_ADDR_CONF) ? 1 : 0;
+            DWIN_WriteVar(DWIN_DETAIL_CONF_ADDR_ADDR, buf, 2);
+
+            /* 帧 5-6：传感器图标 0x1890-0x18CE（63 个 word） */
+            uint8_t *p = buf;
+            uint8_t count = 0;
+            uint16_t icon_addr = DWIN_DETAIL_SENSOR_ICON_ADDR;
+
+            for (uint8_t i = 1; i <= 63; i++)
+            {
+                uint16_t icon = DetailSensorIcon(selectAddr, i);
+                *p++ = (uint8_t)(icon >> 8);
+                *p++ = (uint8_t)(icon & 0xFF);
+                count++;
+
+                if (count == 32 || i == 63)
+                {
+                    DWIN_WriteVar(icon_addr, buf, count * 2);
+                    icon_addr += count;
+                    count = 0;
+                    p = buf;
+                }
+            }
         }
 
-        /* ---- 帧 5：系统状态图标（地址 0x1881，1 个 word） ---- */
-        uint16_t sys_icon = HostCalcSysIcon();
-        buf[0] = (uint8_t)(sys_icon >> 8);
-        buf[1] = (uint8_t)(sys_icon & 0xFF);
-        DWIN_WriteVar(DWIN_HOST_STATUS_ICON_ADDR, buf, 2);
-
-        /* ---- 等待 500ms 进入下一轮 ---- */
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 }

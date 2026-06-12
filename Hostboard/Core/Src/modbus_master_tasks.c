@@ -28,6 +28,9 @@
 #include "usart.h"
 
 /* USER CODE BEGIN 0 */
+#include <string.h>
+#include "detail_view_data.h"
+#include "dwin.h"
 
 /* 3.5 字符时间 @ 9600 8N1 ≈ 3.65 ms → 4 ticks */
 #define MODBUS_3_5_CHAR_TICKS  pdMS_TO_TICKS(4)
@@ -44,6 +47,68 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+/* ==================== 详情数据推送 ==================== */
+
+static void DetailPushToDwin(uint8_t sensor_idx, uint8_t type, const uint16_t *regs)
+{
+    uint8_t buf[32];
+    memset(buf, 0, sizeof(buf));
+    uint16_t addr = DWIN_DETAIL_SENSOR_DATA_ADDR + (uint16_t)(sensor_idx - 1) * 16;
+
+    switch (type)
+    {
+        case 0x01:  /* CO 传感器 */
+        {
+            float val = (float)(regs[0]) / 100.0f;
+            uint32_t *p = (uint32_t *)&val;
+            buf[0] = (uint8_t)(*p >> 24);
+            buf[1] = (uint8_t)(*p >> 16);
+            buf[2] = (uint8_t)(*p >> 8);
+            buf[3] = (uint8_t)(*p);
+            break;
+        }
+        case 0x02:  /* 风压传感器 — 与 Controlboard 标准布局一致 (word 2-3) */
+        {
+            float val = (float)(regs[0]);
+            uint32_t *p = (uint32_t *)&val;
+            buf[4] = (uint8_t)(*p >> 24);
+            buf[5] = (uint8_t)(*p >> 16);
+            buf[6] = (uint8_t)(*p >> 8);
+            buf[7] = (uint8_t)(*p);
+            break;
+        }
+        case 0x03:  /* 余压传感器 — 与 Controlboard 标准布局一致 (word 4) */
+        {
+            buf[8] = (uint8_t)(regs[0] >> 8);
+            buf[9] = (uint8_t)(regs[0] & 0xFF);
+            break;
+        }
+        case 0x04:  /* 7 合 1 传感器 */
+        {
+            buf[10] = (uint8_t)(regs[0] >> 8);  buf[11] = (uint8_t)(regs[0] & 0xFF);
+            buf[12] = (uint8_t)(regs[1] >> 8);  buf[13] = (uint8_t)(regs[1] & 0xFF);
+            buf[14] = (uint8_t)(regs[2] >> 8);  buf[15] = (uint8_t)(regs[2] & 0xFF);
+            { float v = (float)(regs[3]); uint32_t *p = (uint32_t *)&v;
+              buf[16] = (uint8_t)(*p >> 24); buf[17] = (uint8_t)(*p >> 16);
+              buf[18] = (uint8_t)(*p >> 8);  buf[19] = (uint8_t)(*p); }
+            { float v = (float)(regs[4]); uint32_t *p = (uint32_t *)&v;
+              buf[20] = (uint8_t)(*p >> 24); buf[21] = (uint8_t)(*p >> 16);
+              buf[22] = (uint8_t)(*p >> 8);  buf[23] = (uint8_t)(*p); }
+            { float v = (float)(regs[5]) / 10.0f; uint32_t *p = (uint32_t *)&v;
+              buf[24] = (uint8_t)(*p >> 24); buf[25] = (uint8_t)(*p >> 16);
+              buf[26] = (uint8_t)(*p >> 8);  buf[27] = (uint8_t)(*p); }
+            { float v = (float)(regs[6]) / 10.0f; uint32_t *p = (uint32_t *)&v;
+              buf[28] = (uint8_t)(*p >> 24); buf[29] = (uint8_t)(*p >> 16);
+              buf[30] = (uint8_t)(*p >> 8);  buf[31] = (uint8_t)(*p); }
+            break;
+        }
+        default:
+            return;
+    }
+
+    DWIN_WriteVar(addr, buf, 32);
+}
 
 /* ==================== 发送任务 ==================== */
 
@@ -141,6 +206,12 @@ void TaskModbusRecv(void *arg)
                 {
                     /* 全量 17 字节响应 → 完整覆盖 */
                     HostReg_StoreCoilData(slave_addr, &raw.frame[3], byte_cnt);
+
+                    /* 如果是选中控制器的 FC 0x02 响应 → 标记线圈就绪 */
+                    if (slave_addr == g_hostDwinStatus.selectAddr)
+                    {
+                        DetailView_SetCoilReady(slave_addr);
+                    }
                 }
                 else if (byte_cnt == 1 && slave_addr == g_host_last_req.slave_addr)
                 {
@@ -151,6 +222,41 @@ void TaskModbusRecv(void *arg)
                                              &raw.frame[3]);
                 }
                 /* else: 其他长度 → 忽略（不应发生） */
+            }
+
+            /* ── FC 0x03 响应：传感器型号或数据（详情采集用） ── */
+            else if (func_code == 0x03
+                     && slave_addr == g_host_last_req.slave_addr
+                     && byte_cnt > 0
+                     && (3 + byte_cnt + 2) <= raw.length)
+            {
+                uint16_t reg_addr = g_host_last_req.reg_addr;
+                uint8_t  reg_count = byte_cnt / 2;
+                uint16_t regs[7];
+                uint8_t  i;
+
+                if (reg_count > 7) reg_count = 7;
+
+                for (i = 0; i < reg_count; i++)
+                {
+                    regs[i] = ((uint16_t)raw.frame[3 + i * 2] << 8)
+                            | raw.frame[3 + i * 2 + 1];
+                }
+
+                if (reg_addr >= 1 && reg_addr <= 63)
+                {
+                    /* Controlboard 将 uint8 型号扩展为 uint16，型号在低字节 */
+                    DetailView_SetType((uint8_t)reg_addr, (uint8_t)(regs[0] & 0xFF));
+                }
+                else if (reg_addr >= 64)
+                {
+                    uint8_t sensor_idx = (uint8_t)((reg_addr - 64) / 7 + 1);
+                    uint8_t type = DetailView_GetType(sensor_idx);
+                    if (type != 0)
+                    {
+                        DetailPushToDwin(sensor_idx, type, regs);
+                    }
+                }
             }
             /* else: 功能码异常或格式错误 → 忽略不计 */
 

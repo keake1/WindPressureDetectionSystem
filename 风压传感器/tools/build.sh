@@ -36,7 +36,7 @@ echo "SDCC: $("$SDCC" --version 2>&1 | head -1)"
 mkdir -p "$BUILD"
 
 SOURCES=(
-    main.cs
+    main.c
     board.c
     crc16.c
     display.c
