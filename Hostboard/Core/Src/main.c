@@ -118,6 +118,9 @@ int main(void)
   xTaskCreate(TaskDwinRx, "DwinRx", 128, NULL, 1, NULL);
   xTaskCreate(TaskDwinIcons, "DwinIcons", 128, NULL, 1, NULL);
 
+  /* ---- 创建报警监测任务 ---- */
+  xTaskCreate(TaskAlarmMonitor, "AlarmMon", 128, NULL, 1, NULL);
+
   /* ---- 启动 FreeRTOS 调度器 ---- */
   /* 调度器启动后，main 函数不再返回，由任务接管 */
   vTaskStartScheduler();

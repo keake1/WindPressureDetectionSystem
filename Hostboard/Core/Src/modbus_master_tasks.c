@@ -35,13 +35,12 @@
 /* 3.5 字符时间 @ 9600 8N1 ≈ 3.65 ms → 4 ticks */
 #define MODBUS_3_5_CHAR_TICKS  pdMS_TO_TICKS(4)
 
-/* 等待响应超时 */
-#define MODBUS_RESP_TIMEOUT    pdMS_TO_TICKS(30)
-
 /* USER CODE END 0 */
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
+
+static TickType_t CalcModbusTimeout(void);
 
 /* USER CODE END PFP */
 
@@ -110,6 +109,34 @@ static void DetailPushToDwin(uint8_t sensor_idx, uint8_t type, const uint16_t *r
     DWIN_WriteVar(addr, buf, 32);
 }
 
+/* ==================== 动态超时计算 ==================== */
+
+/**
+  * @brief  根据当前在飞请求计算响应超时
+  * @note   FC 0x03：每个寄存器回复 2 字节，估计帧长 5 + reg_count*2 字节
+  *         FC 0x02：每 8 位回复 1 字节，估计帧长 5 + ceil(reg_count/8) 字节
+  *         @9600 baud ≈ 1.04 ms/字节，加处理裕量按 2 ms/字节计算
+  * @retval 超时 Tick 数
+  */
+static TickType_t CalcModbusTimeout(void)
+{
+    uint16_t resp_bytes;
+
+    if (g_host_last_req.func_code == 0x02U)
+    {
+        /* FC 0x02 响应：reg_count 是位数 */
+        resp_bytes = 5U + ((uint16_t)(g_host_last_req.reg_count + 7U) >> 3);
+    }
+    else
+    {
+        /* FC 0x03 响应：reg_count 是寄存器数，每寄存 2 字节 */
+        resp_bytes = 5U + (uint16_t)(g_host_last_req.reg_count * 2U);
+    }
+
+    /* 基值 15ms + 每字节 2ms 裕量 */
+    return pdMS_TO_TICKS(15U + resp_bytes * 2U);
+}
+
 /* ==================== 发送任务 ==================== */
 
 void TaskModbusSend(void *arg)
@@ -152,7 +179,7 @@ void TaskModbusSend(void *arg)
 
         /* ---- 5. 发送完成 → 开启接收窗口，等待响应 ---- */
         ModbusMaster_StartRx();
-        xSemaphoreTake(xMasterRxSem, MODBUS_RESP_TIMEOUT);
+        xSemaphoreTake(xMasterRxSem, CalcModbusTimeout());
 
         /* ---- 6. 关闭接收中断窗口 ---- */
         ModbusMaster_DisableRx();
@@ -213,9 +240,9 @@ void TaskModbusRecv(void *arg)
                         DetailView_SetCoilReady(slave_addr);
                     }
                 }
-                else if (byte_cnt == 1 && slave_addr == g_host_last_req.slave_addr)
+                else if (byte_cnt > 0 && slave_addr == g_host_last_req.slave_addr)
                 {
-                    /* 精简 1 字节响应 → 按位写入指定偏移 */
+                    /* 精简响应（如 67 bits/9 字节轮询）→ 按位写入指定偏移 */
                     HostReg_StorePartialBits(slave_addr,
                                              g_host_last_req.reg_addr,
                                              g_host_last_req.reg_count,

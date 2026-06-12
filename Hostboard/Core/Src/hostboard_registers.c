@@ -241,4 +241,43 @@ void HostReg_StepCycle(void)
                      || zero_addr_history[2];
 }
 
+/* ==================== 报警位快速打包 API ==================== */
+
+/**
+ * @brief  将控制器的报警相关位打包为 uint64_t
+ * @param  addr  Controlboard 地址 (1-128)
+ * @retval 64 位报警位图
+ *         bit  0 = coil_data bit 129 (烟雾报警, sensorIdx 0)
+ *         bit  1 = coil_data bit 63  (传感器 1 报警)
+ *         bit  2 = coil_data bit 64  (传感器 2 报警)
+ *         ... 以此类推 ...
+ *         bit 63 = coil_data bit 125 (传感器 63 报警)
+ * @note   __builtin_ctzll() 可直接得到 sensorIdx，无需映射
+ */
+uint64_t HostReg_GetAlarmBits64(uint8_t addr)
+{
+    if (addr < 1 || addr > MAX_CTRLBD_ADDR)
+        return 0;
+
+    const uint8_t *cd = ctrl_boards[addr].coil_data;
+    uint64_t alarms = 0;
+
+    /* 烟雾报警 bit 129 → bit 0 */
+    if (cd[16] & 0x02)
+        alarms |= 1ULL;
+
+    /* 传感器 1-63 报警 bits 63-125 → bits 1-63 */
+    alarms |= (uint64_t)(cd[7] >> 7)         << 1;
+    alarms |= (uint64_t)(cd[8])              << 2;
+    alarms |= (uint64_t)(cd[9])              << 10;
+    alarms |= (uint64_t)(cd[10])             << 18;
+    alarms |= (uint64_t)(cd[11])             << 26;
+    alarms |= (uint64_t)(cd[12])             << 34;
+    alarms |= (uint64_t)(cd[13])             << 42;
+    alarms |= (uint64_t)(cd[14])             << 50;
+    alarms |= (uint64_t)(cd[15] & 0x3F)      << 58;
+
+    return alarms;
+}
+
 /* USER CODE END 1 */

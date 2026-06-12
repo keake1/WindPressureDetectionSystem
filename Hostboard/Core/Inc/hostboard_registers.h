@@ -95,6 +95,11 @@ void HostReg_StorePartialBits(uint8_t addr, uint16_t reg_addr,
                               uint16_t bit_count, const uint8_t *data);
 /** @} */
 
+/** @defgroup HostReg_Alarm 报警位快速打包 */
+/** @{ */
+uint64_t HostReg_GetAlarmBits64(uint8_t addr);
+/** @} */
+
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */

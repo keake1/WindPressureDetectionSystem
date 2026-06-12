@@ -30,6 +30,7 @@ extern "C" {
 void TaskDwinTx(void *arg);
 void TaskDwinRx(void *arg);
 void TaskDwinIcons(void *arg);
+void TaskAlarmMonitor(void *arg);
 
 /* USER CODE BEGIN EFP */
 

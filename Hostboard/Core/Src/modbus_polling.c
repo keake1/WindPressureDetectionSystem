@@ -191,11 +191,9 @@ void TaskModbusPoll(void *arg)
             continue;   /* 跳过本次常规轮询 */
         }
 
-        /* ---- 构造 FC 0x02 请求：读 3 bits（126-128） ---- */
+        /* ---- 构造 FC 0x02 请求（各分支设置 reg_addr/reg_value） ---- */
         ModbusMasterRequest_t req;
         req.func_code  = MODBUS_FUNC_READ_DISCRETE_INPUTS;
-        req.reg_addr   = 126;
-        req.reg_value  = 3;
 
         /* 每 8 次正常轮询穿插 1 次在线控制器 */
         if (poll_count >= 8)
@@ -206,7 +204,10 @@ void TaskModbusPoll(void *arg)
 
         if (do_online)
         {
-            /* ---- 在线穿插：找下一个在线控制器 ---- */
+            /* ---- 在线穿插：读 67 bits（63-129）获取完整传感器状态 ---- */
+            req.reg_addr   = 63;
+            req.reg_value  = 67;
+
             uint8_t found = 0;
             for (uint16_t i = 0; i < MAX_CTRLBD_ADDR; i++)
             {
@@ -237,7 +238,9 @@ void TaskModbusPoll(void *arg)
             }
         }
 
-        /* ---- 正常地址轮询 ---- */
+        /* ---- 正常地址轮询：读 4 bits（126-129） ---- */
+        req.reg_addr   = 126;
+        req.reg_value  = 4;
         req.slave_addr = (uint8_t)current_addr;
         ModbusMaster_EnqueueRequest(&req);
 

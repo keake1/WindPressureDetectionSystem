@@ -35,6 +35,26 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+/* ==================== 报警监测环缓冲与快照 ==================== */
+
+/**
+ * @brief  报警事件（由 0→1 跳变产生）
+ */
+typedef struct {
+    uint8_t ctrlAddr;   /* 控制器地址 1-128 */
+    uint8_t sensorIdx;  /* 传感器索引 0-63: 0=烟雾报警, 1-63=传感器编号 */
+} alarm_event_t;
+
+#define ALARM_EVENT_BUF_SIZE    8U
+
+static alarm_event_t s_alarm_buf[ALARM_EVENT_BUF_SIZE];  /* 事件环缓冲 */
+static uint8_t       s_alarm_wr;          /* 环缓冲写索引 */
+static uint8_t       s_alarm_rd;          /* 环缓冲读索引 */
+static uint8_t       s_pending_flag;      /* 1=有挂起的 RTC 请求待处理 */
+static uint8_t       s_pending_ctrl;      /* 挂起事件的控制器地址 */
+static uint8_t       s_pending_sensor;    /* 挂起事件的传感器索引 */
+static uint64_t      s_prev_alarm[MAX_CTRLBD_ADDR + 1];  /* 上一周期报警位快照 */
+
 /* ==================== 图标计算辅助函数 ==================== */
 
 static uint16_t HostCalcCtrlIcon(uint8_t addr)
@@ -46,7 +66,8 @@ static uint16_t HostCalcCtrlIcon(uint8_t addr)
         HostReg_GetCoilBit(addr, COIL_OFFSET_ADDR_CONF))
         return DWIN_ICON_TROUBLE;
 
-    if (HostReg_GetCoilBit(addr, COIL_GLOBAL_ALARM))
+    if (HostReg_GetCoilBit(addr, COIL_GLOBAL_ALARM) ||
+        HostReg_GetCoilBit(addr, COIL_SMOKE_ALARM))
         return DWIN_ICON_ALARM;
 
     return DWIN_ICON_NORMAL;
@@ -314,6 +335,88 @@ void TaskDwinIcons(void *arg)
         }
 
         vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+
+/* ==================== 报警监测任务（每 50ms） ==================== */
+
+void TaskAlarmMonitor(void *arg)
+{
+    (void)arg;
+
+    for (;;)
+    {
+        vTaskDelay(pdMS_TO_TICKS(50));
+
+        /* ---- 状态机：WAIT_RTC 分支（等待迪文屏 RTC 应答） ---- */
+        if (s_pending_flag)
+        {
+            if (g_hostDwinStatus.rtcReady)
+            {
+                /* RTC 已就绪 → 写入报警记录 */
+                DWIN_RTC_t rtc;
+                rtc.year   = g_hostDwinStatus.rtcYear;
+                rtc.month  = g_hostDwinStatus.rtcMonth;
+                rtc.day    = g_hostDwinStatus.rtcDay;
+                rtc.hour   = g_hostDwinStatus.rtcHour;
+                rtc.minute = g_hostDwinStatus.rtcMinute;
+                rtc.second = g_hostDwinStatus.rtcSecond;
+
+                DWIN_WriteAlarmRecord(&rtc, s_pending_ctrl, s_pending_sensor);
+
+                g_hostDwinStatus.rtcReady = 0U;
+                s_pending_flag = 0;
+
+                /* 环缓冲中还有事件？→ 立即处理下一个 */
+                if (s_alarm_rd != s_alarm_wr)
+                {
+                    s_pending_ctrl   = s_alarm_buf[s_alarm_rd].ctrlAddr;
+                    s_pending_sensor = s_alarm_buf[s_alarm_rd].sensorIdx;
+                    s_alarm_rd = (s_alarm_rd + 1U) % ALARM_EVENT_BUF_SIZE;
+                    s_pending_flag = 1;
+                    DWIN_ReadRTC();
+                }
+            }
+            /* rtcReady == 0 → 继续等待下个周期 */
+            continue;
+        }
+
+        /* ---- 状态机：IDLE 分支（扫描所有在线控制器） ---- */
+        for (uint16_t addr = 1; addr <= MAX_CTRLBD_ADDR; addr++)
+        {
+            if (!HostReg_IsOnline((uint8_t)addr))
+                continue;
+
+            uint64_t curr    = HostReg_GetAlarmBits64((uint8_t)addr);
+            uint64_t rising  = curr & ~s_prev_alarm[(uint8_t)addr];
+            s_prev_alarm[(uint8_t)addr] = curr;
+
+            /* 遍历所有 0→1 跳变的位 → 入环缓冲 */
+            while (rising)
+            {
+                uint8_t n   = (uint8_t)__builtin_ctzll(rising);
+                rising     &= (rising - 1ULL);  /* 清除最低置位位 */
+
+                uint8_t next = (uint8_t)(s_alarm_wr + 1U) % ALARM_EVENT_BUF_SIZE;
+                if (next != s_alarm_rd)
+                {
+                    s_alarm_buf[s_alarm_wr].ctrlAddr  = (uint8_t)addr;
+                    s_alarm_buf[s_alarm_wr].sensorIdx = n;
+                    s_alarm_wr = next;
+                }
+                /* 环缓冲满 → 丢弃 latest，下轮扫描会重新检出 */
+            }
+        }
+
+        /* ---- 环缓冲有事件 → 出队第一个，发起 RTC 读取 ---- */
+        if (s_alarm_rd != s_alarm_wr)
+        {
+            s_pending_ctrl   = s_alarm_buf[s_alarm_rd].ctrlAddr;
+            s_pending_sensor = s_alarm_buf[s_alarm_rd].sensorIdx;
+            s_alarm_rd = (s_alarm_rd + 1U) % ALARM_EVENT_BUF_SIZE;
+            s_pending_flag = 1;
+            DWIN_ReadRTC();
+        }
     }
 }
 
