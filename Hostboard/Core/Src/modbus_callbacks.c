@@ -11,6 +11,9 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+#include "dwin_tasks.h"
+/* USER CODE END Includes */
 #include "uart1_modbus_master.h"
 #include "usart.h"
 
@@ -30,6 +33,13 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
     {
         BaseType_t xWoken = pdFALSE;
         xSemaphoreGiveFromISR(xDwinTxCompleteSem, &xWoken);
+        portYIELD_FROM_ISR(xWoken);
+    }
+    /* ---- USART2 打印机 TX 完成 ---- */
+    else if (huart == &huart2)
+    {
+        BaseType_t xWoken = pdFALSE;
+        xSemaphoreGiveFromISR(xPrinterTxCompleteSem, &xWoken);
         portYIELD_FROM_ISR(xWoken);
     }
 }

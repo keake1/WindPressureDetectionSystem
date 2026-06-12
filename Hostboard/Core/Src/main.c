@@ -51,6 +51,10 @@
 
 /* USER CODE BEGIN PV */
 
+/* 打印机发送队列和 TX 完成信号量 */
+QueueHandle_t      xPrinterTxQueue;
+SemaphoreHandle_t  xPrinterTxCompleteSem;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -104,6 +108,10 @@ int main(void)
   /* ---- 初始化 USART3 迪文屏队列和信号量 ---- */
   Dwin_InitQueues();
 
+  /* ---- 打印机信号量/队列 ---- */
+  xPrinterTxQueue         = xQueueCreate(4, sizeof(printer_job_t));
+  xPrinterTxCompleteSem   = xSemaphoreCreateBinary();
+
   /* ---- 创建 Modbus 发送任务 ---- */
   xTaskCreate(TaskModbusSend, "MstSend", 128, NULL, 2, NULL);
 
@@ -120,6 +128,9 @@ int main(void)
 
   /* ---- 创建报警监测任务 ---- */
   xTaskCreate(TaskAlarmMonitor, "AlarmMon", 128, NULL, 1, NULL);
+
+  /* ---- 创建打印机发送任务 ---- */
+  xTaskCreate(TaskPrinterTx, "PrtTx", 128, NULL, 1, NULL);
 
   /* ---- 启动 FreeRTOS 调度器 ---- */
   /* 调度器启动后，main 函数不再返回，由任务接管 */

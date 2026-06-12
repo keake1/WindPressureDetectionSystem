@@ -24,7 +24,7 @@
 #include <string.h>
 
 /* USER CODE BEGIN 0 */
-
+#include <stdio.h>
 /* USER CODE END 0 */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -364,6 +364,18 @@ void TaskAlarmMonitor(void *arg)
 
                 DWIN_WriteAlarmRecord(&rtc, s_pending_ctrl, s_pending_sensor);
 
+                /* 打印机非阻塞入队 */
+                printer_job_t pjob;
+                pjob.ctrlAddr   = s_pending_ctrl;
+                pjob.sensorIdx  = s_pending_sensor;
+                pjob.rtcYear    = rtc.year;
+                pjob.rtcMonth   = rtc.month;
+                pjob.rtcDay     = rtc.day;
+                pjob.rtcHour    = rtc.hour;
+                pjob.rtcMinute  = rtc.minute;
+                pjob.rtcSecond  = rtc.second;
+                xQueueSend(xPrinterTxQueue, &pjob, 0);
+
                 g_hostDwinStatus.rtcReady = 0U;
                 s_pending_flag = 0;
 
@@ -417,6 +429,84 @@ void TaskAlarmMonitor(void *arg)
             s_pending_flag = 1;
             DWIN_ReadRTC();
         }
+    }
+}
+
+/* ==================== 打印机发送函数 ==================== */
+
+/**
+ * @brief  中断发送一段数据到打印机，等待 TX 完成
+ * @param  data 数据指针
+ * @param  len  数据长度
+ */
+static void Printer_Send(const uint8_t *data, uint16_t len)
+{
+    HAL_UART_Transmit_IT(&huart2, (uint8_t *)data, len);
+    xSemaphoreTake(xPrinterTxCompleteSem, pdMS_TO_TICKS(100));
+}
+
+/**
+ * @brief  打印一条报警记录
+ * @param  job  打印机作业结构体指针
+ */
+static void Printer_PrintAlarm(const printer_job_t *job)
+{
+    /* ---- ESC/POS 指令 ---- */
+    const uint8_t cmd_init[]  = {0x1B, 0x40};                /* 初始化 */
+    const uint8_t cmd_align[] = {0x1B, 0x61, 0x01};          /* 居中 */
+    const uint8_t cmd_size[]  = {0x1D, 0x21, 0x11};          /* 倍高倍宽 */
+    const uint8_t feed[]      = {0x1B, 0x64, 0x02};          /* 走纸 2 行 */
+    const uint8_t crlf[]      = {0x0D, 0x0A};                /* 回车换行 */
+
+    /* ---- GBK 编码中文 ---- */
+    const uint8_t cn_sl[] = {0xB4, 0xD3, 0xBB, 0xFA};       /* 从机 */
+    const uint8_t cn_dt[] = {0xBC, 0xEC, 0xB2, 0xE2, 0xC6, 0xF7}; /* 检测器 */
+    const uint8_t cn_tm[] = {0xCA, 0xB1, 0xBC, 0xE4};       /* 时间 */
+
+    /* ---- ASCII 数字 ---- */
+    char buf_s[4], buf_d[4], date_buf[12], time_buf[12];
+    sprintf(buf_s, "%02u", (unsigned)job->ctrlAddr);
+    sprintf(buf_d, "%02u", (unsigned)job->sensorIdx);
+    sprintf(date_buf, "%02u-%02u-%02u",
+            (unsigned)job->rtcYear, (unsigned)job->rtcMonth, (unsigned)job->rtcDay);
+    sprintf(time_buf, "%02u:%02u:%02u",
+            (unsigned)job->rtcHour, (unsigned)job->rtcMinute, (unsigned)job->rtcSecond);
+
+    /* ---- 发送打印内容 ---- */
+    Printer_Send(cmd_init, sizeof(cmd_init));
+    Printer_Send(cmd_align, sizeof(cmd_align));
+    Printer_Send(cmd_size, sizeof(cmd_size));
+
+    Printer_Send(cn_sl, sizeof(cn_sl));
+    Printer_Send((const uint8_t *)buf_s, 2);
+    Printer_Send(cn_dt, sizeof(cn_dt));
+    Printer_Send((const uint8_t *)buf_d, 2);
+    Printer_Send(crlf, sizeof(crlf));
+
+    Printer_Send(cn_tm, sizeof(cn_tm));
+    Printer_Send(crlf, sizeof(crlf));
+    Printer_Send((const uint8_t *)date_buf, strlen(date_buf));
+    Printer_Send(crlf, sizeof(crlf));
+    Printer_Send((const uint8_t *)time_buf, strlen(time_buf));
+    Printer_Send(crlf, sizeof(crlf));
+
+    Printer_Send(feed, sizeof(feed));
+}
+
+/* ==================== 打印机发送任务 ==================== */
+
+void TaskPrinterTx(void *arg)
+{
+    (void)arg;
+    printer_job_t job;
+
+    for (;;)
+    {
+        /* 阻塞等待打印机作业 */
+        if (xQueueReceive(xPrinterTxQueue, &job, portMAX_DELAY) != pdPASS)
+            continue;
+
+        Printer_PrintAlarm(&job);
     }
 }
 

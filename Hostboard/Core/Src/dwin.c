@@ -191,7 +191,7 @@ void DWIN_WriteAlarmRecord(const DWIN_RTC_t *rtc, uint8_t ctrlAddr, uint8_t sens
     buf[4] = rtc->hour;
     buf[5] = rtc->minute;
     buf[6] = ctrlAddr;                     /* 控制器地址（原 buf[7]，秒字段移除）*/
-    buf[7] = sensorIdx + 1;                    /* 报警传感器槽位索引（0~63)*/
+    buf[7] = sensorIdx;                    /* 报警传感器槽位索引（0~63)*/
 
     DWIN_WriteVar(addr, buf, sizeof(buf));
 

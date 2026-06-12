@@ -22,7 +22,8 @@ extern "C" {
 #include "task.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "semphr.h"
+#include "queue.h"
 /* USER CODE END Includes */
 
 /* Exported functions prototypes ---------------------------------------------*/
@@ -31,8 +32,27 @@ void TaskDwinTx(void *arg);
 void TaskDwinRx(void *arg);
 void TaskDwinIcons(void *arg);
 void TaskAlarmMonitor(void *arg);
+void TaskPrinterTx(void *arg);    /* 新增 */
 
 /* USER CODE BEGIN EFP */
+
+/* 打印机 TX 完成信号量 */
+extern SemaphoreHandle_t xPrinterTxCompleteSem;
+
+/* 打印机发送队列 */
+extern QueueHandle_t     xPrinterTxQueue;
+
+/* 打印机作业结构体 */
+typedef struct {
+    uint8_t     ctrlAddr;   /* 控制器地址 1-128 */
+    uint8_t     sensorIdx;  /* 传感器索引 0=烟雾, 1-63=传感器编号 */
+    uint8_t     rtcYear;
+    uint8_t     rtcMonth;
+    uint8_t     rtcDay;
+    uint8_t     rtcHour;
+    uint8_t     rtcMinute;
+    uint8_t     rtcSecond;
+} printer_job_t;
 
 /* USER CODE END EFP */
 
