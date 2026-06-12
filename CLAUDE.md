@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 板卡 | MCU | 构建 | 编译器 |
 |------|-----|------|--------|
 | Hostboard | STM32F407VET6 (M4F, 168MHz) | CMake+Ninja | `/opt/arm-gnu-toolchain-15.2.rel1/bin/arm-none-eabi-gcc` |
+| 热敏打印机 | USART2 (PA2/PA3, 9600) | — | 连接到 Hostboard |
 | Controlboard | STM32F070xB (M0, 48MHz) | CMake+Ninja | 同上 |
 | 风压传感器 | STC8H1K28 (51) | SDCC | `sdcc -mmcs51` |
 | CO/余压/7合1 | STC8H 系列 (51) | Keil (Windows) | C51 |
@@ -32,7 +33,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 要理解系统，按此顺序读源码：
 
-1. **`Hostboard/Core/Src/main.c`** — 任务创建（7 个 FreeRTOS 任务）
+1. **`Hostboard/Core/Src/main.c`** — 任务创建（8 个 FreeRTOS 任务）
 2. **`Hostboard/Core/Src/modbus_polling.c`** — 轮询策略（50ms/地址, 0-128，正常 4bits/在线穿插 67bits 交替）
 3. **`Hostboard/Core/Src/hostboard_registers.c`** — 线圈存储布局、零地址/重复地址检测
 4. **`Hostboard/Core/Src/modbus_master_tasks.c`** — 发送/接收任务 + 动态超时
@@ -51,6 +52,7 @@ USART1 (PA9/PA10, 9600 8N1)  ─────────────  UART2 (PA2
 - **Controlboard** 同时是 **Modbus 主站**（USART1 轮询 0-63 传感器）和 **Modbus 从站**（UART2 响应 Hostboard）
 - **Hostboard** 每 50ms 顺序扫描地址 0-128（FC 0x02），每 8 次正常轮询穿插 1 次在线控制器读 67bits(63-129)
 - **迪文屏**（Hostboard USART3, 115200）：DGUS II 协议，0x82 写/0x83 读，ISR 状态机组装帧
+- **热敏打印机**（Hostboard USART2, 9600）：IT 中断发送 + TX 完成信号量，通过独立任务 `TaskPrinterTx` + 4 槽队列接收报警打印作业
 
 ## 线圈寄存器布局（Hostboard hostboard_registers.h）
 
