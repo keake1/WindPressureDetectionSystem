@@ -85,7 +85,8 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  /* FreeRTOS 要求所有 4 位优先级都用于抢占，无子优先级 */
+  HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -113,24 +114,24 @@ int main(void)
   xPrinterTxCompleteSem   = xSemaphoreCreateBinary();
 
   /* ---- 创建 Modbus 发送任务 ---- */
-  xTaskCreate(TaskModbusSend, "MstSend", 128, NULL, 2, NULL);
+  xTaskCreate(TaskModbusSend, "MstSend", 256, NULL, 2, NULL);
 
   /* ---- 创建 Modbus 接收任务 ---- */
-  xTaskCreate(TaskModbusRecv, "MstRecv", 128, NULL, 2, NULL);
+  xTaskCreate(TaskModbusRecv, "MstRecv", 256, NULL, 2, NULL);
 
   /* ---- 创建 Modbus 轮询任务（低优先级） ---- */
-  xTaskCreate(TaskModbusPoll, "MstPoll", 128, NULL, 1, NULL);
+  xTaskCreate(TaskModbusPoll, "MstPoll", 256, NULL, 1, NULL);
 
   /* ---- 创建 USART3 迪文屏发送/接收/图标更新任务 ---- */
-  xTaskCreate(TaskDwinTx, "DwinTx", 128, NULL, 1, NULL);
-  xTaskCreate(TaskDwinRx, "DwinRx", 128, NULL, 1, NULL);
-  xTaskCreate(TaskDwinIcons, "DwinIcons", 128, NULL, 1, NULL);
+  xTaskCreate(TaskDwinTx, "DwinTx", 256, NULL, 1, NULL);
+  xTaskCreate(TaskDwinRx, "DwinRx", 256, NULL, 1, NULL);
+  xTaskCreate(TaskDwinIcons, "DwinIcons", 256, NULL, 1, NULL);
 
   /* ---- 创建报警监测任务 ---- */
-  xTaskCreate(TaskAlarmMonitor, "AlarmMon", 128, NULL, 1, NULL);
+  xTaskCreate(TaskAlarmMonitor, "AlarmMon", 256, NULL, 1, NULL);
 
   /* ---- 创建打印机发送任务 ---- */
-  xTaskCreate(TaskPrinterTx, "PrtTx", 128, NULL, 1, NULL);
+   xTaskCreate(TaskPrinterTx, "PrtTx", 256, NULL, 1, NULL);
 
   /* ---- 启动 FreeRTOS 调度器 ---- */
   /* 调度器启动后，main 函数不再返回，由任务接管 */

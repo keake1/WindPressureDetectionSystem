@@ -21,7 +21,7 @@ void main()
 	P3M1 = 0;   P3M0 = 0;   
 	P5M1 = 0;   P5M0 = 0;   
 	P2M0 |= 0x01 << 2;
-	//LEDÍÆÍìÊä³ö
+	//LEDï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	P2M1 &= ~(0x01 << 2);
 	P3M0 |= 0x01 << 4;
 	P3M1 &= ~(0x01) << 4;
@@ -70,7 +70,7 @@ void error_handle(void)
 void Pressure_reg0002_write()
 {
 	float a;
-	//»ñÈ¡ÆøÑ¹¼ÆµÄÖµ
+	//ï¿½ï¿½È¡ï¿½ï¿½Ñ¹ï¿½Æµï¿½Öµ
 	temperature = user_spl0703_get_temperature();
 	pressure  = user_spl0703_get_presure();
 	
@@ -122,7 +122,7 @@ void run_500ms(void)
 {
 //	char temp[40];
 	P22 = ~P22;
-//	sprintf(temp, "p:%.0f£¬d:%d\r\nt:%d\r\norigin:%.0f", pressure, d_pressure, (int)temperature, origin_pressure);
+//	sprintf(temp, "p:%.0fï¿½ï¿½d:%d\r\nt:%d\r\norigin:%.0f", pressure, d_pressure, (int)temperature, origin_pressure);
 //	PrintString1(temp);
 	
 }
@@ -144,7 +144,7 @@ uint8 count10ms;
 uint16 count500ms;
 uint8 count100ms;
 
-//1ms1´Î
+//1ms1ï¿½ï¿½
 //void Timer2() interrupt TIMER2_VECTOR
 void Timer0() interrupt TIMER0_VECTOR
 {	

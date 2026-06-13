@@ -25,6 +25,10 @@
 #include "dwin.h"
 #include "detail_view_data.h"
 /* USER CODE BEGIN 0 */
+#include "main.h"       /* LED3_Pin / LED3_GPIO_Port */
+
+/* LED3 闪烁间隔：每轮询多少个地址翻转一次（可调）*/
+#define LED3_BLINK_INTERVAL  16U
 
 /* ==================== 详情采集状态机 ==================== */
 
@@ -177,6 +181,8 @@ void TaskModbusPoll(void *arg)
         vTaskDelay(pdMS_TO_TICKS(50U));
     }
     
+    static uint8_t  s_led3_count    = 0;
+
     for (;;)
     {
         /* ---- 轮询间隔 50ms ---- */
@@ -246,6 +252,14 @@ void TaskModbusPoll(void *arg)
 
         poll_count++;
         current_addr++;
+
+        /* LED3 心跳：每轮询 LED3_BLINK_INTERVAL 个地址翻转一次 */
+        if (++s_led3_count >= LED3_BLINK_INTERVAL)
+        {
+            s_led3_count = 0;
+            HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+        }
+
         if (current_addr > MAX_CTRLBD_ADDR)
         {
             current_addr = 0;
