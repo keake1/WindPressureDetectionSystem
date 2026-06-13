@@ -208,6 +208,15 @@ void TaskModbusReceive(void *arg)
                         }
                         break;
                     }
+                    case SENSOR_MODEL_CO2:
+                    {
+                        uint16_t co2 = ModbusReg_GetData(slave, 0);
+                        if (cur_alarm == 0 && co2 > 1000)
+                            new_alarm = 1;
+                        else if (cur_alarm == 1 && co2 < 800)
+                            new_alarm = 0;
+                        break;
+                    }
                     default:
                         break;
                 }

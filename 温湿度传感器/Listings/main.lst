@@ -1,0 +1,116 @@
+C51 COMPILER V9.60.7.0   MAIN                                                              03/12/2026 16:15:43 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE User\Src\main.c OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\User\Inc) DEBUG P
+                    -RINT(.\Listings\main.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <STC8H.H>
+   2          #include "gpio.h"
+   3          #include "timer.h"
+   4          #include "task.h"
+   5          #include "uart.h"
+   6          #include "iic.h"
+   7          #include "aht30.h"
+   8          #include "protocol.h"
+   9          
+  10          void Delay1ms(void);
+  11          void DelayMs(unsigned int ms);
+  12          
+  13          
+  14          #define FOSC  24000000UL   /* 24 MHz，与 STC-ISP 中设置保持一致 */
+  15          
+  16          void main()
+  17          {
+  18   1          GPIO_Init();    /* 初始化 GPIO */
+  19   1          Uart1_Init();   /* 初始化串口1，9600bps */
+  20   1          IIC_Init();     /* 初始化软件模拟 I²C */
+  21   1          DelayMs(100);   /* 等待 AHT30 上电稳定（手册要求 ≥100ms） */
+  22   1          AHT30_Init();   /* 初始化 AHT30 温湿度传感器 */
+  23   1          Timer0_Init();  /* 初始化定时器0，1ms 中断 */
+  24   1          EA = 1;         /* 开总中断 */
+  25   1          DelayMs(200);
+  26   1          while(1)
+  27   1          {
+  28   2              /* 10ms 任务 */
+  29   2              if(cnt_10ms >= 10)
+  30   2              {
+  31   3                  cnt_10ms = 0;
+  32   3                  Task_10ms();
+  33   3              }
+  34   2      
+  35   2              /* 50ms 任务 */
+  36   2              if(cnt_50ms >= 50)
+  37   2              {
+  38   3                  cnt_50ms = 0;
+  39   3                  Task_50ms();
+  40   3              }
+  41   2      
+  42   2              /* 100ms 任务 */
+  43   2              if(cnt_100ms >= 100)
+  44   2              {
+  45   3                  cnt_100ms = 0;
+  46   3                  Task_100ms();
+  47   3              }
+  48   2      
+  49   2              /* 500ms 任务 */
+  50   2              if(cnt_500ms >= 500)
+  51   2              {
+  52   3                  cnt_500ms = 0;
+  53   3                  Task_500ms();
+  54   3              }
+C51 COMPILER V9.60.7.0   MAIN                                                              03/12/2026 16:15:43 PAGE 2   
+
+  55   2      
+  56   2              /* 1000ms 任务 */
+  57   2              if(cnt_1000ms >= 1000)
+  58   2              {
+  59   3                  cnt_1000ms = 0;
+  60   3                  Task_1000ms();
+  61   3              }
+  62   2          }
+  63   1      }
+  64          
+  65          void Delay1ms(void) //@24.000MHz
+  66          {
+  67   1        unsigned char data i, j;
+  68   1      
+  69   1        _nop_();
+  70   1        i = 32;
+  71   1        j = 40;
+  72   1        do
+  73   1        {
+  74   2          while (--j);
+  75   2        } while (--i);
+  76   1      }
+  77          
+  78          /* 通用毫秒延时：调用 Delay1ms() ms 次，最大延时 65535ms */
+  79          void DelayMs(unsigned int ms)
+  80          {
+  81   1          while (ms--)
+  82   1          {
+  83   2              Delay1ms();
+  84   2          }
+  85   1      }
+  86          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    158    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

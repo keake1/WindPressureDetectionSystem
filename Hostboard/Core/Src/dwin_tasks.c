@@ -103,6 +103,29 @@ static uint16_t DetailSensorIcon(uint8_t selectAddr, uint8_t sensor_idx)
     return DWIN_ICON_NORMAL;
 }
 
+/* ==================== 迪文屏初始化任务（一次性） ==================== */
+
+void TaskDwinInit(void *arg)
+{
+    (void)arg;
+
+    for (uint16_t slot = 0U; slot < DWIN_TIP_SLOT_COUNT; slot++)
+    {
+        uint32_t flash_addr = DWIN_TIP_FLASH_ADDR(slot);
+        DWIN_NorFlashRead(flash_addr, DWIN_TIP_READ_BUF_ADDR, DWIN_TIP_WORDS_PER_SLOT);
+        vTaskDelay(pdMS_TO_TICKS(50U));
+
+        DWIN_ReadVar(DWIN_TIP_READ_BUF_ADDR, (uint8_t)DWIN_TIP_WORDS_PER_SLOT);
+        vTaskDelay(pdMS_TO_TICKS(50U));
+    }
+
+    /* 通知等待的任务：连续 Give 两次，放行两个 Take */
+    xSemaphoreGive(xDwinInitDoneSem);
+    xSemaphoreGive(xDwinInitDoneSem);
+
+    vTaskDelete(NULL);
+}
+
 /* ==================== USART3 发送任务 ==================== */
 
 void TaskDwinTx(void *arg)
@@ -261,6 +284,9 @@ void TaskDwinIcons(void *arg)
     (void)arg;
     uint8_t buf[64];
 
+    /* 等待迪文屏初始化完成 */
+    xSemaphoreTake(xDwinInitDoneSem, portMAX_DELAY);
+
     for (;;)
     {
         uint8_t selectAddr = g_hostDwinStatus.selectAddr;
@@ -343,6 +369,9 @@ void TaskDwinIcons(void *arg)
 void TaskAlarmMonitor(void *arg)
 {
     (void)arg;
+
+    /* 等待迪文屏初始化完成 */
+    xSemaphoreTake(xDwinInitDoneSem, portMAX_DELAY);
 
     for (;;)
     {

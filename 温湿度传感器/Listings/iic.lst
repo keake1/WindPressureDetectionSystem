@@ -1,0 +1,160 @@
+C51 COMPILER V9.60.7.0   IIC                                                               03/12/2026 16:09:45 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE IIC
+OBJECT MODULE PLACED IN .\Objects\iic.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE User\Src\iic.c OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\User\Inc) DEBUG PR
+                    -INT(.\Listings\iic.lst) TABS(2) OBJECT(.\Objects\iic.obj)
+
+line level    source
+
+   1          #include <STC8H.H>
+   2          #include <intrins.h>
+   3          #include "iic.h"
+   4          
+   5          /*
+   6           * 软件模拟 I²C
+   7           * SCL -> P3.2，SDA -> P3.3，准双向口模式
+   8           * 参考官方 AHT2x 例程时序：SCL高持续4us，低持续2us
+   9           */
+  10          
+  11          /* 微秒级延时（@24MHz，约1us/次） */
+  12          static void iic_delay(unsigned char us)
+  13          {
+  14   1          while(us--)
+  15   1          {
+  16   2              _nop_(); _nop_(); _nop_(); _nop_();
+  17   2              _nop_(); _nop_(); _nop_(); _nop_();
+  18   2              _nop_(); _nop_(); _nop_(); _nop_();
+  19   2          }
+  20   1      }
+  21          
+  22          /* IIC 初始化：P3.2/P3.3 配置为准双向口，释放总线 */
+  23          void IIC_Init(void)
+  24          {
+  25   1          /* 准双向口：M1=0, M0=0（STC8H上电默认即为准双向口，此处显式配置） */
+  26   1          P3M1 &= ~0x0C;
+  27   1          P3M0 &= ~0x0C;
+  28   1      
+  29   1          IIC_SCL = 1;
+  30   1          IIC_SDA = 1;
+  31   1          iic_delay(4);
+  32   1      }
+  33          
+  34          /* START：SCL高时，SDA下降沿 */
+  35          void IIC_Start(void)
+  36          {
+  37   1          IIC_SCL = 1;
+  38   1          IIC_SDA = 1;
+  39   1          iic_delay(2);
+  40   1          IIC_SDA = 0;   /* SDA下降沿 */
+  41   1          iic_delay(4);
+  42   1          IIC_SCL = 0;   /* 拉低SCL，准备发数据 */
+  43   1          iic_delay(2);
+  44   1      }
+  45          
+  46          /* STOP：SCL高时，SDA上升沿 */
+  47          void IIC_Stop(void)
+  48          {
+  49   1          IIC_SCL = 0;
+  50   1          IIC_SDA = 0;
+  51   1          iic_delay(2);
+  52   1          IIC_SCL = 1;
+  53   1          iic_delay(4);
+  54   1          IIC_SDA = 1;   /* SDA上升沿 */
+C51 COMPILER V9.60.7.0   IIC                                                               03/12/2026 16:09:45 PAGE 2   
+
+  55   1          iic_delay(4);
+  56   1      }
+  57          
+  58          /* 发送1字节，高位先发 */
+  59          void IIC_SendByte(unsigned char dat)
+  60          {
+  61   1          unsigned char i;
+  62   1          for(i = 0; i < 8; i++)
+  63   1          {
+  64   2              IIC_SCL = 0;
+  65   2              iic_delay(2);
+  66   2              if(dat & 0x80) IIC_SDA = 1;
+  67   2              else           IIC_SDA = 0;
+  68   2              iic_delay(2);
+  69   2              IIC_SCL = 1;
+  70   2              iic_delay(4);
+  71   2              dat <<= 1;
+  72   2          }
+  73   1          IIC_SCL = 0;   /* 第9个时钟前拉低，准备接收ACK */
+  74   1          iic_delay(2);
+  75   1      }
+  76          
+  77          /* 等待从机ACK：返回0=收到ACK，返回1=NACK/超时 */
+  78          unsigned char IIC_WaitAck(void)
+  79          {
+  80   1          unsigned int timeout = 200;
+  81   1          IIC_SDA = 1;       /* 释放SDA，由从机驱动 */
+  82   1          iic_delay(2);
+  83   1          IIC_SCL = 1;
+  84   1          iic_delay(4);
+  85   1          while(IIC_SDA)     /* 等待SDA被从机拉低 */
+  86   1          {
+  87   2              if(--timeout == 0)
+  88   2              {
+  89   3                  IIC_SCL = 0;
+  90   3                  iic_delay(2);
+  91   3                  return 1;  /* 超时，NACK */
+  92   3              }
+  93   2          }
+  94   1          IIC_SCL = 0;
+  95   1          iic_delay(2);
+  96   1          return 0;          /* ACK */
+  97   1      }
+  98          
+  99          /* 接收1字节
+ 100           * ack=1：发ACK（告知从机继续发）
+ 101           * ack=0：发NACK（告知从机停止）
+ 102           */
+ 103          unsigned char IIC_RecvByte(unsigned char ack)
+ 104          {
+ 105   1          unsigned char i, dat = 0;
+ 106   1          IIC_SDA = 1;       /* 释放SDA准备接收 */
+ 107   1          for(i = 0; i < 8; i++)
+ 108   1          {
+ 109   2              IIC_SCL = 0;
+ 110   2              iic_delay(2);
+ 111   2              IIC_SCL = 1;
+ 112   2              iic_delay(4);
+ 113   2              dat <<= 1;
+ 114   2              if(IIC_SDA) dat |= 0x01;
+ 115   2          }
+ 116   1          IIC_SCL = 0;
+C51 COMPILER V9.60.7.0   IIC                                                               03/12/2026 16:09:45 PAGE 3   
+
+ 117   1          iic_delay(2);
+ 118   1          /* 发送ACK/NACK */
+ 119   1          if(ack) IIC_SDA = 0;   /* ACK:  拉低SDA */
+ 120   1          else    IIC_SDA = 1;   /* NACK: 释放SDA */
+ 121   1          iic_delay(2);
+ 122   1          IIC_SCL = 1;
+ 123   1          iic_delay(4);
+ 124   1          IIC_SCL = 0;
+ 125   1          IIC_SDA = 1;
+ 126   1          iic_delay(2);
+ 127   1          return dat;
+ 128   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    219    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

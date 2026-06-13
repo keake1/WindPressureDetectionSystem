@@ -1,0 +1,162 @@
+C51 COMPILER V9.60.7.0   PROTOCOL                                                          03/12/2026 16:14:44 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE PROTOCOL
+OBJECT MODULE PLACED IN .\Objects\protocol.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE User\Src\protocol.c OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\User\Inc) DEB
+                    -UG PRINT(.\Listings\protocol.lst) TABS(2) OBJECT(.\Objects\protocol.obj)
+
+line level    source
+
+   1          #include <STC8H.H>
+   2          #include "protocol.h"
+   3          #include "uart.h"
+   4          #include "gpio.h"
+   5          #include "aht30.h"
+   6          
+   7          /*
+   8           * Modbus CRC16 计算
+   9           * 初始值 0xFFFF，多项式 0xA001（反转多项式 0x8005）
+  10           * 结果低字节在前
+  11           */
+  12          unsigned int CRC16(unsigned char *buf, unsigned char len)
+  13          {
+  14   1          unsigned int crc = 0xFFFF;
+  15   1          unsigned char i, j;
+  16   1          for(i = 0; i < len; i++)
+  17   1          {
+  18   2              crc ^= buf[i];
+  19   2              for(j = 0; j < 8; j++)
+  20   2              {
+  21   3                  if(crc & 0x0001) crc = (crc >> 1) ^ 0xA001;
+  22   3                  else             crc >>= 1;
+  23   3              }
+  24   2          }
+  25   1          return crc;   /* 低字节=crc&0xFF，高字节=crc>>8 */
+  26   1      }
+  27          
+  28          /*
+  29           * 串口协议处理函数
+  30           * 在主循环中轮询调用，收到完整帧后进行解析和回复
+  31           */
+  32          void Protocol_Process(void)
+  33          {
+  34   1          unsigned int  crc_calc, crc_recv;
+  35   1          unsigned char tx_buf[9];
+  36   1          unsigned int  crc_tx;
+  37   1      
+  38   1          /* 未收到数据 */
+  39   1          if(!g_uart_rx_flag) return;
+  40   1      
+  41   1          // /* ---- 调试回显：收到什么就原样发回去 ---- */
+  42   1          // Uart1_SendBuffer(g_uart_rx_buf, g_uart_rx_len);
+  43   1          // /* ---------------------------------------- */
+  44   1      
+  45   1          /* 判断帧长度是否正确
+  46   1           * 注：串口采用超时判帧，g_uart_rx_flag=1时数据已全部收完
+  47   1           * 若长度不对说明帧不完整或有干扰，丢弃该帧等待下一帧 */
+  48   1          if(g_uart_rx_len != PROTO_RX_LEN)
+  49   1          {
+  50   2              g_uart_rx_flag = 0;
+  51   2              g_uart_rx_len  = 0;
+  52   2              return;
+  53   2          }
+  54   1      
+C51 COMPILER V9.60.7.0   PROTOCOL                                                          03/12/2026 16:14:44 PAGE 2   
+
+  55   1          /* 判断地址是否匹配 */
+  56   1          if(g_uart_rx_buf[0] != g_device_addr)
+  57   1          {
+  58   2              g_uart_rx_flag = 0;
+  59   2              g_uart_rx_len  = 0;
+  60   2              return;
+  61   2          }
+  62   1      
+  63   1          /* 验证 CRC16（校验范围：[0]~[5]，共6字节） */
+  64   1          crc_calc = CRC16(g_uart_rx_buf, 6);
+  65   1          crc_recv = (unsigned int)g_uart_rx_buf[7] << 8 | g_uart_rx_buf[6]; /* 低字节在前 */
+  66   1          if(crc_calc != crc_recv)
+  67   1          {
+  68   2              g_uart_rx_flag = 0;
+  69   2              g_uart_rx_len  = 0;
+  70   2              return;
+  71   2          }
+  72   1      
+  73   1          /* 根据功能码处理 */
+  74   1          switch(g_uart_rx_buf[1])
+  75   1          {
+  76   2              case PROTO_FUNC_03:
+  77   2              {
+  78   3                  /*
+  79   3                   * 应答帧（9字节）：
+  80   3                   *   [0]    设备地址
+  81   3                   *   [1]    功能码 0x03
+  82   3                   *   [2]    数据字节数 = 4
+  83   3                   *   [3]    温度高字节（×10，有符号）
+  84   3                   *   [4]    温度低字节
+  85   3                   *   [5]    湿度高字节（×10）
+  86   3                   *   [6]    湿度低字节
+  87   3                   *   [7]    CRC低字节
+  88   3                   *   [8]    CRC高字节
+  89   3                   */
+  90   3                  tx_buf[0] = g_device_addr;
+  91   3                  tx_buf[1] = PROTO_FUNC_03;
+  92   3                  tx_buf[2] = 4;
+  93   3                  tx_buf[3] = (unsigned char)((g_aht30.temperature >> 8) & 0xFF);
+  94   3                  tx_buf[4] = (unsigned char)(g_aht30.temperature & 0xFF);
+  95   3                  tx_buf[5] = (unsigned char)((g_aht30.humidity >> 8) & 0xFF);
+  96   3                  tx_buf[6] = (unsigned char)(g_aht30.humidity & 0xFF);
+  97   3      
+  98   3                  crc_tx    = CRC16(tx_buf, 7);
+  99   3                  tx_buf[7] = (unsigned char)(crc_tx & 0xFF);        /* CRC低字节 */
+ 100   3                  tx_buf[8] = (unsigned char)((crc_tx >> 8) & 0xFF); /* CRC高字节 */
+ 101   3      
+ 102   3                  Uart1_SendBuffer(tx_buf, 9);
+ 103   3                  break;
+ 104   3              }
+ 105   2              case PROTO_FUNC_06:
+ 106   2              {
+ 107   3                  /*
+ 108   3                   * 0x06 写控制命令
+ 109   3                   * [2~3] 寄存器地址：0x00 0x04
+ 110   3                   * [4~5] 写入值：0x00 0x01=点亮红灯  0x00 0x00=熄灭红灯
+ 111   3                   * 应答：原帧回显（8字节）
+ 112   3                   */
+ 113   3                  unsigned int reg_addr = (unsigned int)g_uart_rx_buf[2] << 8 | g_uart_rx_buf[3];
+ 114   3                  unsigned int reg_val  = (unsigned int)g_uart_rx_buf[4] << 8 | g_uart_rx_buf[5];
+ 115   3      
+ 116   3                  if(reg_addr == 0x0004)
+C51 COMPILER V9.60.7.0   PROTOCOL                                                          03/12/2026 16:14:44 PAGE 3   
+
+ 117   3                  {
+ 118   4                      if(reg_val == 0x0001)       LED_RED_ON();    /* 点亮红灯 */
+ 119   4                      else if(reg_val == 0x0000)  LED_RED_OFF();   /* 熄灭红灯 */
+ 120   4                  }
+ 121   3                  break;
+ 122   3              }
+ 123   2              default:
+ 124   2                  break;
+ 125   2          }
+ 126   1      
+ 127   1          /* 清空接收缓冲区 */
+ 128   1          g_uart_rx_flag = 0;
+ 129   1          g_uart_rx_len  = 0;
+ 130   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    262    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      19
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

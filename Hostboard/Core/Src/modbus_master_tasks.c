@@ -94,12 +94,28 @@ static void DetailPushToDwin(uint8_t sensor_idx, uint8_t type, const uint16_t *r
             { float v = (float)(regs[4]); uint32_t *p = (uint32_t *)&v;
               buf[20] = (uint8_t)(*p >> 24); buf[21] = (uint8_t)(*p >> 16);
               buf[22] = (uint8_t)(*p >> 8);  buf[23] = (uint8_t)(*p); }
-            { float v = (float)(regs[5]) / 10.0f; uint32_t *p = (uint32_t *)&v;
+            { float v = (float)(int16_t)(regs[5]) / 10.0f; uint32_t *p = (uint32_t *)&v;
               buf[24] = (uint8_t)(*p >> 24); buf[25] = (uint8_t)(*p >> 16);
               buf[26] = (uint8_t)(*p >> 8);  buf[27] = (uint8_t)(*p); }
             { float v = (float)(regs[6]) / 10.0f; uint32_t *p = (uint32_t *)&v;
               buf[28] = (uint8_t)(*p >> 24); buf[29] = (uint8_t)(*p >> 16);
               buf[30] = (uint8_t)(*p >> 8);  buf[31] = (uint8_t)(*p); }
+            break;
+        }
+        case 0x05:  /* 温湿度传感器 — 温度/湿度到偏移 12-15（与 7 合 1 位置一致） */
+        {
+            { float v = (float)(int16_t)(regs[0]) / 10.0f; uint32_t *p = (uint32_t *)&v;
+              buf[24] = (uint8_t)(*p >> 24); buf[25] = (uint8_t)(*p >> 16);
+              buf[26] = (uint8_t)(*p >> 8);  buf[27] = (uint8_t)(*p); }
+            { float v = (float)(regs[1]) / 10.0f; uint32_t *p = (uint32_t *)&v;
+              buf[28] = (uint8_t)(*p >> 24); buf[29] = (uint8_t)(*p >> 16);
+              buf[30] = (uint8_t)(*p >> 8);  buf[31] = (uint8_t)(*p); }
+            break;
+        }
+        case 0x06:  /* CO2 传感器 — CO2 浓度到偏移 10-11（复用 7 合 1 的 eCO₂ 位置） */
+        {
+            buf[10] = (uint8_t)(regs[0] >> 8);
+            buf[11] = (uint8_t)(regs[0] & 0xFF);
             break;
         }
         default:

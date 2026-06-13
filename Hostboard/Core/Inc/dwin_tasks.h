@@ -36,6 +36,10 @@ void TaskPrinterTx(void *arg);    /* 新增 */
 
 /* USER CODE BEGIN EFP */
 
+/* 迪文屏初始化完成信号量（Counting，最大 2，初值 0） */
+extern SemaphoreHandle_t xDwinInitDoneSem;
+void TaskDwinInit(void *arg);
+
 /* 打印机 TX 完成信号量 */
 extern SemaphoreHandle_t xPrinterTxCompleteSem;
 

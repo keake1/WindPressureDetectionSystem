@@ -1,0 +1,103 @@
+C51 COMPILER V9.60.7.0   GPIO                                                              03/12/2026 16:09:45 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE GPIO
+OBJECT MODULE PLACED IN .\Objects\gpio.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE User\Src\gpio.c OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\User\Inc) DEBUG P
+                    -RINT(.\Listings\gpio.lst) TABS(2) OBJECT(.\Objects\gpio.obj)
+
+line level    source
+
+   1          #include <STC8H.H>
+   2          #include "gpio.h"
+   3          
+   4          /*
+   5           * STC8H GPIO 模式配置（PxM1 / PxM0）：
+   6           *   M1=0  M0=0  ->  准双向口（默认）
+   7           *   M1=0  M0=1  ->  推挽输出  ← LED 使用
+   8           *   M1=1  M0=0  ->  高阻输入  ← 地址拨码使用
+   9           *   M1=1  M0=1  ->  开漏输出
+  10           *
+  11           * P2.2 推挽输出：P2M1 &= ~0x04; P2M0 |=  0x04;
+  12           * P3.4 推挽输出：P3M1 &= ~0x10; P3M0 |=  0x10;
+  13           * P0.2 高阻输入：P0M1 |=  0x04; P0M0 &= ~0x04;
+  14           * P0.3 高阻输入：P0M1 |=  0x08; P0M0 &= ~0x08;
+  15           * P1.2 高阻输入：P1M1 |=  0x04; P1M0 &= ~0x04;
+  16           * P1.3 高阻输入：P1M1 |=  0x08; P1M0 &= ~0x08;
+  17           * P1.4 高阻输入：P1M1 |=  0x10; P1M0 &= ~0x10;
+  18           * P1.5 高阻输入：P1M1 |=  0x20; P1M0 &= ~0x20;
+  19           */
+  20          
+  21          unsigned char g_device_addr = 0;   /* 设备地址全局变量 */
+  22          
+  23          void GPIO_Init(void)
+  24          {
+  25   1          /* ---------- P2.2：绿色 LED，推挽输出，初始熄灭（高电平） ---------- */
+  26   1          P2M1 &= ~0x04;
+  27   1          P2M0 |=  0x04;
+  28   1          LED_GREEN_OFF();
+  29   1      
+  30   1          /* ---------- P3.4：红色 LED，推挽输出，初始熄灭（高电平） ---------- */
+  31   1          P3M1 &= ~0x10;
+  32   1          P3M0 |=  0x10;
+  33   1          LED_RED_OFF();
+  34   1      
+  35   1          /* ---------- P0.2、P0.3：地址拨码 bit5、bit4，高阻输入 ---------- */
+  36   1          P0M1 |=  0x0C;   /* P0M1[3:2] = 1 */
+  37   1          P0M0 &= ~0x0C;   /* P0M0[3:2] = 0 */
+  38   1      
+  39   1          /* ---------- P1.2~P1.5：地址拨码 bit3~bit0，高阻输入 ---------- */
+  40   1          P1M1 |=  0x3C;   /* P1M1[5:2] = 1 */
+  41   1          P1M0 &= ~0x3C;   /* P1M0[5:2] = 0 */
+  42   1      
+  43   1          /* ---------- 使能内部上拉电阻（需先解锁扩展寄存器） ---------- */
+  44   1          P_SW2 |= 0x80;   /* EAXFR=1，允许访问 XFR 扩展寄存器 */
+  45   1          P0PU  |= 0x0C;   /* P0.2、P0.3 上拉使能 */
+  46   1          P1PU  |= 0x3C;   /* P1.2、P1.3、P1.4、P1.5 上拉使能 */
+  47   1          P_SW2 &= ~0x80;  /* EAXFR=0，关闭扩展寄存器访问 */
+  48   1      }
+  49          
+  50          /* 翻转绿色 LED（P2.2）电平 */
+  51          void LED_GREEN_Toggle(void)
+  52          {
+  53   1          P2 ^= 0x04;   /* 对 P2.2 位取反 */
+  54   1      }
+C51 COMPILER V9.60.7.0   GPIO                                                              03/12/2026 16:09:45 PAGE 2   
+
+  55          
+  56          /*
+  57           * 读取拨码地址
+  58           * 引脚低电平 -> 对应位为 1，高电平 -> 对应位为 0
+  59           * 返回值：0 ~ 63
+  60           */
+  61          unsigned char Read_DeviceAddr(void)
+  62          {
+  63   1          unsigned char addr = 0;
+  64   1      
+  65   1          if(!ADDR_BIT5) addr |= 0x20;   /* P0.2 -> bit5 */
+  66   1          if(!ADDR_BIT4) addr |= 0x10;   /* P0.3 -> bit4 */
+  67   1          if(!ADDR_BIT3) addr |= 0x08;   /* P1.2 -> bit3 */
+  68   1          if(!ADDR_BIT2) addr |= 0x04;   /* P1.3 -> bit2 */
+  69   1          if(!ADDR_BIT1) addr |= 0x02;   /* P1.4 -> bit1 */
+  70   1          if(!ADDR_BIT0) addr |= 0x01;   /* P1.5 -> bit0 */
+  71   1      
+  72   1          return addr;
+  73   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     89    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      1    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

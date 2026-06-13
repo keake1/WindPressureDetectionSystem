@@ -1,0 +1,135 @@
+C51 COMPILER V9.60.7.0   AHT30                                                             03/12/2026 16:09:45 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE AHT30
+OBJECT MODULE PLACED IN .\Objects\aht30.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE User\Src\aht30.c OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\User\Inc) DEBUG 
+                    -PRINT(.\Listings\aht30.lst) TABS(2) OBJECT(.\Objects\aht30.obj)
+
+line level    source
+
+   1          #include <STC8H.H>
+   2          #include "aht30.h"
+   3          #include "iic.h"
+   4          
+   5          AHT30_Data_t g_aht30 = {0, 0};   /* 全局温湿度数据 */
+   6          
+   7          /*
+   8           * AHT30 初始化
+   9           * 上电后等待100ms，发送初始化命令 0xBE 0x08 0x00
+  10           */
+  11          void AHT30_Init(void)
+  12          {
+  13   1          IIC_Start();
+  14   1          IIC_SendByte(AHT30_ADDR_WRITE);
+  15   1          IIC_WaitAck();
+  16   1          IIC_SendByte(0xBE);         /* 初始化命令 */
+  17   1          IIC_WaitAck();
+  18   1          IIC_SendByte(0x08);
+  19   1          IIC_WaitAck();
+  20   1          IIC_SendByte(0x00);
+  21   1          IIC_WaitAck();
+  22   1          IIC_Stop();
+  23   1      }
+  24          
+  25          /*
+  26           * 触发一次测量
+  27           * 发送测量命令 0xAC 0x33 0x00
+  28           * 返回 0：发送成功；返回 1：ACK 异常
+  29           */
+  30          unsigned char AHT30_Measure(void)
+  31          {
+  32   1          unsigned char ack;
+  33   1      
+  34   1          IIC_Start();
+  35   1          IIC_SendByte(AHT30_ADDR_WRITE);
+  36   1          ack = IIC_WaitAck();
+  37   1          if(ack) { IIC_Stop(); return 1; }
+  38   1      
+  39   1          IIC_SendByte(0xAC);         /* 触发测量命令 */
+  40   1          IIC_WaitAck();
+  41   1          IIC_SendByte(0x33);
+  42   1          IIC_WaitAck();
+  43   1          IIC_SendByte(0x00);
+  44   1          IIC_WaitAck();
+  45   1          IIC_Stop();
+  46   1      
+  47   1          return 0;
+  48   1      }
+  49          
+  50          /*
+  51           * 读取7字节原始数据并解析（第7字节为CRC，AHT30返回7字节）
+  52           * 需在 AHT30_Measure() 后等待约 80ms 再调用
+  53           * 返回 0：成功；返回 1：忙/未校准/ACK异常
+  54           *
+C51 COMPILER V9.60.7.0   AHT30                                                             03/12/2026 16:09:45 PAGE 2   
+
+  55           * 原始数据格式（7字节）：
+  56           *   Byte0       : 状态字节，bit7=Busy，bit3~4必须=11(已校准)
+  57           *   Byte1~Byte5 : 温湿度数据
+  58           *   Byte6       : CRC校验
+  59           *
+  60           *   湿度原始值 = (Byte1<<12)|(Byte2<<4)|(Byte3>>4)        [20bit]
+  61           *   温度原始值 = ((Byte3&0x0F)<<16)|(Byte4<<8)|Byte5      [20bit]
+  62           *
+  63           * 整数计算（×10倍）：
+  64           *   湿度×10 = 原始值 × 1000 / 1048576
+  65           *   温度×10 = 原始值 × 2000 / 1048576 - 500
+  66           */
+  67          unsigned char AHT30_Read(void)
+  68          {
+  69   1          unsigned char buf[7];
+  70   1          unsigned long raw_humi, raw_temp;
+  71   1      
+  72   1          IIC_Start();
+  73   1          IIC_SendByte(AHT30_ADDR_READ);
+  74   1          if(IIC_WaitAck()) { IIC_Stop(); return 1; }
+  75   1      
+  76   1          buf[0] = IIC_RecvByte(1);   /* 状态字节 */
+  77   1          buf[1] = IIC_RecvByte(1);
+  78   1          buf[2] = IIC_RecvByte(1);
+  79   1          buf[3] = IIC_RecvByte(1);
+  80   1          buf[4] = IIC_RecvByte(1);
+  81   1          buf[5] = IIC_RecvByte(1);
+  82   1          buf[6] = IIC_RecvByte(0);   /* CRC字节，最后一字节发 NACK */
+  83   1          IIC_Stop();
+  84   1      
+  85   1          /* 检查 Busy 位（bit7）和校准标志（bit3~4 必须为 11） */
+  86   1          if((buf[0] & 0x98) != 0x18) return 1;
+  87   1      
+  88   1          /* 解析湿度原始值（20bit） */
+  89   1          raw_humi  = (unsigned long)buf[1] << 12;
+  90   1          raw_humi |= (unsigned long)buf[2] << 4;
+  91   1          raw_humi |= (buf[3] >> 4);
+  92   1      
+  93   1          /* 解析温度原始值（20bit） */
+  94   1          raw_temp  = (unsigned long)(buf[3] & 0x0F) << 16;
+  95   1          raw_temp |= (unsigned long)buf[4] << 8;
+  96   1          raw_temp |= buf[5];
+  97   1      
+  98   1          /* 转换（整数，×10倍保留1位小数，避免浮点运算） */
+  99   1          g_aht30.humidity    = (unsigned int)(raw_humi * 1000 / 1048576);
+ 100   1          g_aht30.temperature = (int)(raw_temp * 2000 / 1048576) - 500;
+ 101   1      
+ 102   1          return 0;
+ 103   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    386    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      4      15
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+C51 COMPILER V9.60.7.0   AHT30                                                             03/12/2026 16:09:45 PAGE 3   
+
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,123 @@
+C51 COMPILER V9.60.7.0   UART                                                              03/12/2026 16:09:45 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE UART
+OBJECT MODULE PLACED IN .\Objects\uart.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE User\Src\uart.c OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\User\Inc) DEBUG P
+                    -RINT(.\Listings\uart.lst) TABS(2) OBJECT(.\Objects\uart.obj)
+
+line level    source
+
+   1          #include <STC8H.H>
+   2          #include "uart.h"
+   3          
+   4          /*
+   5           * 波特率发生器：定时器2，1T模式
+   6           * 重载值 = 65536 - FOSC / (4 * 波特率)
+   7           *        = 65536 - 24000000 / (4 * 9600)
+   8           *        = 65536 - 625
+   9           *        = 64911 = 0xFD8F
+  10           */
+  11          #define UART1_BAUD_RELOAD   0xFD8F
+  12          
+  13          /* 接收缓冲区及状态变量 */
+  14          unsigned char g_uart_rx_buf[UART_RX_BUF_SIZE] = {0};
+  15          unsigned char g_uart_rx_len     = 0;
+  16          unsigned char g_uart_rx_flag    = 0;
+  17          unsigned char g_uart_rx_timeout = 0;   /* 0=无数据/已处理，>0=倒计时中 */
+  18          
+  19          /*
+  20           * 串口1初始化
+  21           * 模式1：8位UART，可变波特率
+  22           * P3.0 -> RX，P3.1 -> TX（默认复用，无需切换）
+  23           */
+  24          void Uart1_Init(void)
+  25          {
+  26   1          /* --- 串口1 配置 --- */
+  27   1          SCON = 0x50;            /* 模式1：8位UART，REN=1 允许接收 */
+  28   1      
+  29   1          /* --- 定时器2 作为波特率发生器（1T模式） --- */
+  30   1          AUXR |= 0x04;           /* 定时器2 选择 1T 模式 */
+  31   1          T2L   = UART1_BAUD_RELOAD & 0xFF;  /* 重载值低字节 */
+  32   1          T2H   = UART1_BAUD_RELOAD >> 8;    /* 重载值高字节 */
+  33   1          AUXR |= 0x15;           /* 串口1选择定时器2为波特率发生器，启动定时器2 */
+  34   1      
+  35   1          /* --- P3.0/P3.1 配置为准双向口（默认，串口使用） --- */
+  36   1          P3M1 &= ~0x03;
+  37   1          P3M0 &= ~0x03;
+  38   1      
+  39   1          /* --- 使能串口1中断 --- */
+  40   1          ES = 1;
+  41   1      }
+  42          
+  43          /* 发送单个字节（查询方式等待发送完成） */
+  44          void Uart1_SendByte(unsigned char dat)
+  45          {
+  46   1          SBUF = dat;
+  47   1          while(!TI);   /* 等待发送完成 */
+  48   1          TI = 0;       /* 清除发送标志 */
+  49   1      }
+  50          
+  51          /* 发送指定长度的数据缓冲区 */
+  52          void Uart1_SendBuffer(unsigned char *buf, unsigned char len)
+  53          {
+  54   1          unsigned char i;
+C51 COMPILER V9.60.7.0   UART                                                              03/12/2026 16:09:45 PAGE 2   
+
+  55   1          for(i = 0; i < len; i++)
+  56   1          {
+  57   2              Uart1_SendByte(buf[i]);
+  58   2          }
+  59   1      }
+  60          
+  61          /* 串口1中断服务函数 */
+  62          void Uart1_ISR(void) interrupt 4
+  63          {
+  64   1          if(RI)   /* 接收中断 */
+  65   1          {
+  66   2              RI = 0;
+  67   2              if(g_uart_rx_len < UART_RX_BUF_SIZE)
+  68   2              {
+  69   3                  g_uart_rx_buf[g_uart_rx_len++] = SBUF;  /* 存入缓冲区 */
+  70   3              }
+  71   2              g_uart_rx_timeout = UART_RX_TIMEOUT_MS;     /* 每收到一字节就重置超时计数器 */
+  72   2          }
+  73   1          if(TI)
+  74   1          {
+  75   2              TI = 0;
+  76   2          }
+  77   1      }
+  78          
+  79          /*
+  80           * 帧超时判断（每 1ms 调用一次，在 Task_1ms 中调用）
+  81           * 超时后认为一帧数据接收完毕，置 g_uart_rx_flag 通知协议层处理
+  82           */
+  83          void Uart1_RxTimeoutTick(void)
+  84          {
+  85   1          if(g_uart_rx_timeout == 0) return;   /* 无数据，不处理 */
+  86   1      
+  87   1          g_uart_rx_timeout--;
+  88   1      
+  89   1          if(g_uart_rx_timeout == 0 && g_uart_rx_len > 0)
+  90   1          {
+  91   2              g_uart_rx_flag = 1;   /* 超时，认为一帧接收完成 */
+  92   2          }
+  93   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    138    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     67       3
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

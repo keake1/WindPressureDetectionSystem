@@ -55,6 +55,9 @@
 QueueHandle_t      xPrinterTxQueue;
 SemaphoreHandle_t  xPrinterTxCompleteSem;
 
+/* 迪文屏初始化完成信号量 */
+SemaphoreHandle_t  xDwinInitDoneSem;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -108,6 +111,9 @@ int main(void)
   /* ---- 初始化 USART3 迪文屏队列和信号量 ---- */
   Dwin_InitQueues();
 
+  /* ---- 迪文屏初始化完成信号量（Counting，最大 2，初值 0） ---- */
+  xDwinInitDoneSem = xSemaphoreCreateCounting(2, 0);
+
   /* ---- 打印机信号量/队列 ---- */
   xPrinterTxQueue         = xQueueCreate(4, sizeof(printer_job_t));
   xPrinterTxCompleteSem   = xSemaphoreCreateBinary();
@@ -131,6 +137,9 @@ int main(void)
 
   /* ---- 创建打印机发送任务 ---- */
    xTaskCreate(TaskPrinterTx, "PrtTx", 256, NULL, 1, NULL);
+
+  /* ---- 创建迪文屏初始化任务（一次性，完成后自删） ---- */
+  xTaskCreate(TaskDwinInit, "DwinInit", 256, NULL, 1, NULL);
 
   /* ---- 启动 FreeRTOS 调度器 ---- */
   /* 调度器启动后，main 函数不再返回，由任务接管 */

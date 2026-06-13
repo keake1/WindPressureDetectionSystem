@@ -189,14 +189,38 @@ static void DWIN_BuildSensorFrame(uint8_t slave, uint8_t model)
             fval = (float)raw;
             FloatToBigEndian(fval, &data[DWIN_OFFSET_PM10 * 2]);
 
-            /* 温度 [5]、湿度 [6] -- raw÷10 */
-            raw  = ModbusReg_GetData(slave, 5);
-            fval = (float)raw / 10.0f;
+            /* 温度 [5] -- raw÷10，有符号 */
+            {
+                int16_t s_temp = (int16_t)ModbusReg_GetData(slave, 5);
+                fval = (float)s_temp / 10.0f;
+            }
             FloatToBigEndian(fval, &data[DWIN_OFFSET_TEMP * 2]);
 
-            raw  = ModbusReg_GetData(slave, 6);
+            /* 湿度 [6] -- raw÷10，无符号 */
+            raw = ModbusReg_GetData(slave, 6);
             fval = (float)raw / 10.0f;
             FloatToBigEndian(fval, &data[DWIN_OFFSET_HUMID * 2]);
+            break;
+
+        case SENSOR_MODEL_TH:
+            /* 温度 reg_data[0]（×10，有符号）→ float 到偏移 12-13 */
+            {
+                int16_t s_temp = (int16_t)ModbusReg_GetData(slave, 0);
+                fval = (float)s_temp / 10.0f;
+            }
+            FloatToBigEndian(fval, &data[DWIN_OFFSET_TEMP * 2]);
+
+            /* 湿度 reg_data[1]（×10）→ float 到偏移 14-15 */
+            raw = ModbusReg_GetData(slave, 1);
+            fval = (float)raw / 10.0f;
+            FloatToBigEndian(fval, &data[DWIN_OFFSET_HUMID * 2]);
+            break;
+
+        case SENSOR_MODEL_CO2:
+            /* CO2 浓度 reg_data[0] → uint16 到偏移 10-11（复用 7 合 1 的 eCO₂ 位置） */
+            raw = ModbusReg_GetData(slave, 0);
+            data[DWIN_OFFSET_CO2 * 2 + 0] = (uint8_t)(raw >> 8);
+            data[DWIN_OFFSET_CO2 * 2 + 1] = (uint8_t)(raw & 0xFF);
             break;
 
         default:
