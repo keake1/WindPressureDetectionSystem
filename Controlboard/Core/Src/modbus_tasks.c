@@ -208,12 +208,31 @@ void TaskModbusReceive(void *arg)
                         }
                         break;
                     }
+                    case SENSOR_MODEL_WIND:
+                    {
+                        uint16_t press = ModbusReg_GetData(slave, 0);
+                        if (cur_alarm == 0 && press > 400)
+                            new_alarm = 1;
+                        else if (cur_alarm == 1 && press < 300)
+                            new_alarm = 0;
+                        break;
+                    }
                     case SENSOR_MODEL_CO2:
                     {
                         uint16_t co2 = ModbusReg_GetData(slave, 0);
                         if (cur_alarm == 0 && co2 > 1000)
                             new_alarm = 1;
                         else if (cur_alarm == 1 && co2 < 800)
+                            new_alarm = 0;
+                        break;
+                    }
+                    case SENSOR_MODEL_TH:
+                    {
+                        /* 温度不参与报警，只判湿度 */
+                        uint16_t hum = ModbusReg_GetData(slave, 1);
+                        if (cur_alarm == 0 && hum > 700)   /* > 70% */
+                            new_alarm = 1;
+                        else if (cur_alarm == 1 && hum < 600)  /* < 60% */
                             new_alarm = 0;
                         break;
                     }

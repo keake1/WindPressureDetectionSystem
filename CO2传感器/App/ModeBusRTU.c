@@ -176,7 +176,8 @@ void ModBus_write(void)
 {
 	uint16_t Reg_address = (uint16_t)((ModbusReceiveBuf[2] << 8) | ModbusReceiveBuf[3]);
 	uint16_t receive_data = (uint16_t)((ModbusReceiveBuf[4] << 8) | ModbusReceiveBuf[5]);
-	Reg[Reg_address] = receive_data;
+	if (Reg_address < 6)  /* Reg 只有 6 个元素 */
+		Reg[Reg_address] = receive_data;
 }
 
 
