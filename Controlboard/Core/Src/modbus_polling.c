@@ -79,6 +79,9 @@ void TaskModbusPoll(void *arg)
 {
     (void)arg;
 
+    /* 启动延迟：等待系统初始化完成后开始轮询 */
+    vTaskDelay(pdMS_TO_TICKS(100));
+
     uint8_t scan_addr   = 0;    /* 顺序扫描地址 0~63 */
     uint8_t poll_count  = 0;    /* 自上次在线轮询后的顺序轮询计数 */
     uint8_t online_idx  = 0;    /* 在线传感器轮询游标 */

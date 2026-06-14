@@ -21,13 +21,14 @@
 /**
  * @brief  零地址检测状态
  *
- * 每轮完整扫描 (0-128) 中: zero_addr_found_this_cycle 记录是否收到 addr0 有效响应
+ * 每轮完整扫描 (0-128) 中: zero_addr_count_this_cycle 累计收到 addr0 有效响应的次数
  * StepCycle() 时移入 zero_addr_history[3] 环形缓冲
- * zero_addr_present = history[0] || history[1] || history[2]
+ * 三轮累加 > 2 → zero_addr_present = 1
+ * （与重复地址探测机制一致，避免单次瞬态误触发）
  */
-static uint8_t  zero_addr_found_this_cycle;     /* 本轮发现标志 */
-static uint8_t  zero_addr_history[3];            /* 三轮历史 */
-static uint8_t  zero_addr_present;               /* 综合结果 */
+static uint32_t zero_addr_count_this_cycle;          /* 本轮零地址响应计数 */
+static uint32_t zero_addr_history[3];                /* 三轮历史 */
+static uint8_t  zero_addr_present;                   /* 综合结果 */
 
 /* ==================== 重复地址检测 ==================== */
 
@@ -121,7 +122,7 @@ uint8_t HostReg_GetCoilBit(uint8_t addr, uint16_t bit_idx)
  */
 void HostReg_RecordZeroAddrResponse(void)
 {
-    zero_addr_found_this_cycle = 1;
+    zero_addr_count_this_cycle++;
 }
 
 /**
@@ -233,12 +234,12 @@ void HostReg_StepCycle(void)
     uint32_t sum = crc_error_history[0] + crc_error_history[1] + crc_error_history[2];
     addr_conflict_flag = (sum > 2) ? 1 : 0;
 
-    /* ---- 零地址检测：三轮 OR ---- */
-    zero_addr_history[(current_cycle - 1) % 3] = zero_addr_found_this_cycle;
-    zero_addr_found_this_cycle = 0;
-    zero_addr_present = zero_addr_history[0]
-                     || zero_addr_history[1]
-                     || zero_addr_history[2];
+    /* ---- 零地址检测：三轮累加 > 2 ---- */
+    zero_addr_history[(current_cycle - 1) % 3] = zero_addr_count_this_cycle;
+    zero_addr_count_this_cycle = 0;
+    zero_addr_present = (zero_addr_history[0]
+                      +  zero_addr_history[1]
+                      +  zero_addr_history[2]) > 2;
 }
 
 /* ==================== 报警位快速打包 API ==================== */

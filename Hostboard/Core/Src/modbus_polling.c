@@ -163,23 +163,14 @@ static void DetailCollect_Step(uint8_t selectAddr)
 void TaskModbusPoll(void *arg)
 {
     (void)arg;
+
+    /* 启动延迟：等待 Controlboard 完全启动并读好 DIP 地址，避免误检测零地址 */
+    vTaskDelay(pdMS_TO_TICKS(500));
+
     uint16_t current_addr = 0;       /* 正常轮询地址 0-128 */
     uint8_t  poll_count    = 0;       /* 正常轮询计数（0-7） */
     uint16_t online_idx    = 1;       /* 在线控制器扫描起始 */
     uint8_t  do_online     = 0;       /* 本次是否穿插在线 */
-
-    for (uint16_t slot = 0U; slot < DWIN_TIP_SLOT_COUNT; slot++)
-    {
-        uint32_t flash_addr = DWIN_TIP_FLASH_ADDR(slot);
-
-        /* 步骤1：从 NorFlash 读到变量暂存区 */
-        DWIN_NorFlashRead(flash_addr, DWIN_TIP_READ_BUF_ADDR, DWIN_TIP_WORDS_PER_SLOT);
-        vTaskDelay(pdMS_TO_TICKS(50U));
-
-        /* 步骤2：发 0x83 读取变量暂存区，触发屏幕返回数据 */
-        DWIN_ReadVar(DWIN_TIP_READ_BUF_ADDR, (uint8_t)DWIN_TIP_WORDS_PER_SLOT);
-        vTaskDelay(pdMS_TO_TICKS(50U));
-    }
     
     static uint8_t  s_led3_count    = 0;
 

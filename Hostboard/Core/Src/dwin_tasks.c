@@ -139,6 +139,8 @@ static uint16_t DetailSensorIcon(uint8_t selectAddr, uint8_t sensor_idx)
 void TaskDwinInit(void *arg)
 {
     (void)arg;
+    
+    vTaskDelay(pdMS_TO_TICKS(1000));  /* 等待系统稳定 */
 
     for (uint16_t slot = 0U; slot < DWIN_TIP_SLOT_COUNT; slot++)
     {
@@ -188,6 +190,13 @@ void TaskDwinRx(void *arg)
     (void)arg;
     DwinFrame_t frame;
     uint8_t cnt_tip = 0;    /* 开机恢复备注进度 */
+
+    DwinRxReset();
+    __HAL_UART_CLEAR_OREFLAG(&huart3);
+    __HAL_UART_CLEAR_FEFLAG(&huart3);
+    __HAL_UART_CLEAR_NEFLAG(&huart3);
+    __HAL_UART_CLEAR_PEFLAG(&huart3);
+    SET_BIT(huart3.Instance->CR1, USART_CR1_RXNEIE);
 
     for (;;)
     {

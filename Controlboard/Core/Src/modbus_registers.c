@@ -31,8 +31,13 @@ static uint64_t coil_alarm  = 0;
 static uint8_t  reg_type[MODBUS_MAX_SLAVES + 1];                     /* [1..63] */
 static uint16_t reg_data[MODBUS_MAX_SLAVES + 1][MODBUS_DATA_REGS_PER_SENSOR]; /* [1..63][0..6] */
 
-/* 零地址出现次数统计 */
+/* 零地址出现次数统计（累计，供调试查看） */
 static uint32_t zero_addr_count = 0;
+
+/* 零地址检测：每轮计数 + 三轮历史（与地址重复检测机制一致） */
+static uint32_t zero_addr_cycle_count;          /* 本轮零地址响应次数 */
+static uint32_t zero_addr_cycle_hist[3];         /* 三轮历史 */
+static uint8_t  zero_addr_present;               /* 综合结果：三轮累加 > 2 */
 
 /* ==================== 离线检测 ====================
  * 每个地址 (0-63) 在哪个周期最后收到过响应。
@@ -263,8 +268,9 @@ void ModbusReg_RecordResponse(uint8_t slave)
     }
     if (slave == 0)
     {
-        /* 0 地址有回复 → 存在 */
-        zero_addr_present = 1;
+        /* 零地址有回复 → 累计本轮次数 */
+        zero_addr_cycle_count++;
+        zero_addr_count++;
     }
 }
 
@@ -290,11 +296,12 @@ void ModbusReg_StepCycle(void)
         }
     }
 
-    /* ---- 检查 0 地址传感器 ---- */
-    if (last_seen_cycle[0] + 3 <= current_cycle)
-    {
-        zero_addr_present = 0;
-    }
+    /* ---- 零地址检测：三轮累加 > 2 ---- */
+    zero_addr_cycle_hist[(current_cycle - 1) % 3] = zero_addr_cycle_count;
+    zero_addr_cycle_count = 0;
+    zero_addr_present = (zero_addr_cycle_hist[0]
+                      +  zero_addr_cycle_hist[1]
+                      +  zero_addr_cycle_hist[2]) > 2;
 
     /* ---- 地址重复检测：记录本轮 CRC 错误数到环形历史 ---- */
     crc_error_history[crc_error_hist_idx] = crc_error_count;

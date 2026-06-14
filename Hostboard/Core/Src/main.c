@@ -86,7 +86,7 @@ int main(void)
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
+  
   /* USER CODE BEGIN Init */
   /* FreeRTOS 要求所有 4 位优先级都用于抢占，无子优先级 */
   HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
