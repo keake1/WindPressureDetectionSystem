@@ -156,7 +156,7 @@ typedef struct {
 #define DWIN_TX_FRAME_MAX   128
 #define DWIN_RX_FRAME_MAX   128
 #define DWIN_TX_QUEUE_LEN   8
-#define DWIN_RX_QUEUE_LEN   4
+#define DWIN_RX_QUEUE_LEN   16
 
 /* USER CODE END EConst */
 

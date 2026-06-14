@@ -25,6 +25,36 @@
 
 /* USER CODE BEGIN 0 */
 #include <stdio.h>
+
+/* ==================== 调试：迪文屏接收帧日志环缓冲 ==================== */
+
+#define DWIN_DBG_RX_LOG_MAX    32U   /* 最多保留 32 帧 */
+#define DWIN_DBG_RX_LOG_LEN    64U   /* 每帧最大记录字节 */
+
+typedef struct {
+    uint32_t tick;                     /* 接收时的 FreeRTOS tick */
+    uint16_t len;                      /* 帧实际长度 */
+    uint8_t  data[DWIN_DBG_RX_LOG_LEN]; /* 帧数据（超长截断）*/
+} dwin_dbg_rx_entry_t;
+
+static dwin_dbg_rx_entry_t s_dbg_rx_log[DWIN_DBG_RX_LOG_MAX];
+static uint8_t s_dbg_rx_idx = 0;      /* 环形写入索引 */
+
+/**
+ * @brief 记录一帧接收数据到调试环缓冲
+ */
+static void Dbg_LogRxFrame(const uint8_t *buf, uint16_t len)
+{
+    dwin_dbg_rx_entry_t *entry = &s_dbg_rx_log[s_dbg_rx_idx];
+    uint16_t copy_len = (len < DWIN_DBG_RX_LOG_LEN) ? len : DWIN_DBG_RX_LOG_LEN;
+
+    entry->tick = xTaskGetTickCount();
+    entry->len  = len;
+    memcpy(entry->data, buf, copy_len);
+
+    s_dbg_rx_idx = (s_dbg_rx_idx + 1U) % DWIN_DBG_RX_LOG_MAX;
+}
+
 /* USER CODE END 0 */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -94,13 +124,14 @@ static uint16_t HostCalcSysIcon(void)
 
 static uint16_t DetailSensorIcon(uint8_t selectAddr, uint8_t sensor_idx)
 {
+    /* 详情页图标值：0=离线, 1=报警, 2=正常（不与主界面图标常量共用）*/
     if (!HostReg_GetCoilBit(selectAddr, sensor_idx - 1))
-        return DWIN_ICON_OFFLINE;
+        return 0;  /* offline */
 
     if (HostReg_GetCoilBit(selectAddr, COIL_OFFSET_ALARM + sensor_idx - 1))
-        return DWIN_ICON_ALARM;
+        return 1;  /* alarm */
 
-    return DWIN_ICON_NORMAL;
+    return 2;  /* normal */
 }
 
 /* ==================== 迪文屏初始化任务（一次性） ==================== */
@@ -163,6 +194,9 @@ void TaskDwinRx(void *arg)
         /* ---- 1. 等待完整帧（ISR 状态机组装后入队） ---- */
         if (xQueueReceive(xDwinRxQueue, &frame, portMAX_DELAY) != pdPASS)
             continue;
+
+        /* 调试：记录收到的原始帧 */
+        Dbg_LogRxFrame(frame.data, frame.length);
 
         uint8_t *buf = frame.data;
         uint16_t len = frame.length;
@@ -307,12 +341,14 @@ void TaskDwinIcons(void *arg)
                 }
 
                 DWIN_WriteVar(base_addr, buf, DWIN_ICONS_PER_FRAME * 2);
+                vTaskDelay(pdMS_TO_TICKS(20));
             }
 
             uint16_t sys_icon = HostCalcSysIcon();
             buf[0] = (uint8_t)(sys_icon >> 8);
             buf[1] = (uint8_t)(sys_icon & 0xFF);
             DWIN_WriteVar(DWIN_HOST_STATUS_ICON_ADDR, buf, 2);
+            vTaskDelay(pdMS_TO_TICKS(20));
         }
         else
         {
@@ -325,19 +361,21 @@ void TaskDwinIcons(void *arg)
                        || HostReg_GetCoilBit(selectAddr, COIL_GLOBAL_ALARM);
             buf[1] = win ? 1 : 0;
             DWIN_WriteVar(DWIN_DETAIL_WIN_ICON_ADDR, buf, 2);
-
+            vTaskDelay(pdMS_TO_TICKS(20));
             /* 帧 2：全局报警 0x1883 */
             buf[1] = HostReg_GetCoilBit(selectAddr, COIL_GLOBAL_ALARM) ? 1 : 0;
             DWIN_WriteVar(DWIN_DETAIL_GLB_ALARM_ADDR, buf, 2);
+            vTaskDelay(pdMS_TO_TICKS(20));
 
             /* 帧 3：零地址 0x1884 */
             buf[1] = HostReg_GetCoilBit(selectAddr, COIL_OFFSET_ZERO_ADDR) ? 1 : 0;
             DWIN_WriteVar(DWIN_DETAIL_ZERO_ADDR_ADDR, buf, 2);
+            vTaskDelay(pdMS_TO_TICKS(20));
 
             /* 帧 4：重复地址 0x1885 */
             buf[1] = HostReg_GetCoilBit(selectAddr, COIL_OFFSET_ADDR_CONF) ? 1 : 0;
             DWIN_WriteVar(DWIN_DETAIL_CONF_ADDR_ADDR, buf, 2);
-
+            vTaskDelay(pdMS_TO_TICKS(20));
             /* 帧 5-6：传感器图标 0x1890-0x18CE（63 个 word） */
             uint8_t *p = buf;
             uint8_t count = 0;
@@ -356,6 +394,7 @@ void TaskDwinIcons(void *arg)
                     icon_addr += count;
                     count = 0;
                     p = buf;
+                    vTaskDelay(pdMS_TO_TICKS(20));
                 }
             }
         }
