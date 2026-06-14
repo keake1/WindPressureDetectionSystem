@@ -1,10 +1,10 @@
-C51 COMPILER V9.56.0.0   MAIN                                                              12/27/2025 16:18:57 PAGE 1   
+C51 COMPILER V9.60.7.0   MAIN                                                              06/14/2026 02:50:39 PAGE 1   
 
 
-C51 COMPILER V9.56.0.0, COMPILATION OF MODULE MAIN
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MAIN
 OBJECT MODULE PLACED IN ..\hex文件\main.obj
-COMPILER INVOKED BY: E:\BaiduNetdiskDownload\KEIL C51\C51\BIN\C51.EXE ..\User\main.c LARGE OPTIMIZE(8,SPEED) BROWSE INCD
-                    -IR(..\User;..\App) DEBUG OBJECTEXTEND PRINT(.\List\main.lst) TABS(2) OBJECT(..\hex文件\main.obj)
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE ..\User\main.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App) DEB
+                    -UG OBJECTEXTEND PRINT(.\List\main.lst) TABS(2) OBJECT(..\hex文件\main.obj)
 
 line level    source
 
@@ -62,7 +62,7 @@ line level    source
   52   1        digital_cube_init();
   53   1        address = addr_read();
   54   1        UART1_config(UART1_P30P31,11059200,9600);
-C51 COMPILER V9.56.0.0   MAIN                                                              12/27/2025 16:18:57 PAGE 2   
+C51 COMPILER V9.60.7.0   MAIN                                                              06/14/2026 02:50:39 PAGE 2   
 
   55   1        UART2_config(UART2_P10P11,11059200,9600);
   56   1      
@@ -72,7 +72,7 @@ line level    source
   60   2          // P34 = 0;
   61   2          //d_CO2 = 1234;//test
   62   2          Digital_Tube_ShowNum(d_CO2);
-  63   2      //    if((d_CO2/100)==23)P34 = 0;
+  63   2      //    if((d_CO2/100)==10)P34 = 0;
   64   2      //    else P34 = 1;
   65   2          //Digital_Tube_ShowNum((int)(CO_Value));
   66   2          //Digital_Tube_ShowNum(ad_value % 1000);
@@ -126,7 +126,7 @@ line level    source
  114   2          
  115   2          uart_send_flag = 0;
  116   2          //Delay_xms(5);
-C51 COMPILER V9.56.0.0   MAIN                                                              12/27/2025 16:18:57 PAGE 3   
+C51 COMPILER V9.60.7.0   MAIN                                                              06/14/2026 02:50:39 PAGE 3   
 
  117   2        }
  118   1        Digital_Tube_flash();
@@ -190,7 +190,7 @@ line level    source
  175   2          count500ms = 0;
  176   2        }
  177   1        if (count1000ms >= 1000) {
-C51 COMPILER V9.56.0.0   MAIN                                                              12/27/2025 16:18:57 PAGE 4   
+C51 COMPILER V9.60.7.0   MAIN                                                              06/14/2026 02:50:39 PAGE 4   
 
  178   2          run_1000ms();
  179   2          count1000ms = 0;

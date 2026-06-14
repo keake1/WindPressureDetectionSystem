@@ -1,10 +1,10 @@
-C51 COMPILER V9.56.0.0   DELAY                                                             12/22/2025 21:51:23 PAGE 1   
+C51 COMPILER V9.60.7.0   DELAY                                                             06/14/2026 02:50:39 PAGE 1   
 
 
-C51 COMPILER V9.56.0.0, COMPILATION OF MODULE DELAY
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE DELAY
 OBJECT MODULE PLACED IN ..\hex文件\delay.obj
-COMPILER INVOKED BY: E:\BaiduNetdiskDownload\KEIL C51\C51\BIN\C51.EXE ..\App\delay.c LARGE OPTIMIZE(8,SPEED) BROWSE INCD
-                    -IR(..\User;..\App) DEBUG OBJECTEXTEND PRINT(.\List\delay.lst) TABS(2) OBJECT(..\hex文件\delay.obj)
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE ..\App\delay.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App) DEB
+                    -UG OBJECTEXTEND PRINT(.\List\delay.lst) TABS(2) OBJECT(..\hex文件\delay.obj)
 
 line level    source
 
@@ -62,7 +62,7 @@ line level    source
                 while (--i);
               }
               
-C51 COMPILER V9.56.0.0   DELAY                                                             12/22/2025 21:51:23 PAGE 2   
+C51 COMPILER V9.60.7.0   DELAY                                                             06/14/2026 02:50:39 PAGE 2   
 
               /*********************************************
               /*鍑芥暟鍚嶇О锛欴elay_ms(void)
@@ -126,7 +126,7 @@ line level    source
  114          void Delay_xms(u16 i)
  115          {
  116   1        u16 k;  
-C51 COMPILER V9.56.0.0   DELAY                                                             12/22/2025 21:51:23 PAGE 3   
+C51 COMPILER V9.60.7.0   DELAY                                                             06/14/2026 02:50:39 PAGE 3   
 
  117   1        for(k=0;k<i;k++)
  118   1        {

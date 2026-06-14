@@ -1,10 +1,10 @@
-C51 COMPILER V9.56.0.0   UART2                                                             12/22/2025 21:51:24 PAGE 1   
+C51 COMPILER V9.60.7.0   UART2                                                             06/14/2026 02:50:40 PAGE 1   
 
 
-C51 COMPILER V9.56.0.0, COMPILATION OF MODULE UART2
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE UART2
 OBJECT MODULE PLACED IN ..\hex�ļ�\uart2.obj
-COMPILER INVOKED BY: E:\BaiduNetdiskDownload\KEIL C51\C51\BIN\C51.EXE ..\App\uart2.c LARGE OPTIMIZE(8,SPEED) BROWSE INCD
-                    -IR(..\User;..\App) DEBUG OBJECTEXTEND PRINT(.\List\uart2.lst) TABS(2) OBJECT(..\hex�ļ�\uart2.obj)
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE ..\App\uart2.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App) DEB
+                    -UG OBJECTEXTEND PRINT(.\List\uart2.lst) TABS(2) OBJECT(..\hex�ļ�\uart2.obj)
 
 line level    source
 
@@ -62,7 +62,7 @@ line level    source
   52   1        IE2  &= ~(1<<2);    //禁止中断
   53   1        AUXR |=  (1<<4);    //Timer run enable
   54   1        S2CON &= ~(1<<7);   // 8位数据, 1位起始位, 1位停止位, 无校验
-C51 COMPILER V9.56.0.0   UART2                                                             12/22/2025 21:51:24 PAGE 2   
+C51 COMPILER V9.60.7.0   UART2                                                             06/14/2026 02:50:40 PAGE 2   
 
   55   1        
   56   1        IP2 |= 1;

@@ -1,4 +1,4 @@
-C51 COMPILER V9.60.7.0   UART                                                              03/12/2026 16:09:45 PAGE 1   
+C51 COMPILER V9.60.7.0   UART                                                              06/14/2026 02:51:10 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE UART
@@ -62,7 +62,7 @@ line level    source
   52          void Uart1_SendBuffer(unsigned char *buf, unsigned char len)
   53          {
   54   1          unsigned char i;
-C51 COMPILER V9.60.7.0   UART                                                              03/12/2026 16:09:45 PAGE 2   
+C51 COMPILER V9.60.7.0   UART                                                              06/14/2026 02:51:10 PAGE 2   
 
   55   1          for(i = 0; i < len; i++)
   56   1          {

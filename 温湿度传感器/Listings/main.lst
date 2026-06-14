@@ -1,4 +1,4 @@
-C51 COMPILER V9.60.7.0   MAIN                                                              03/12/2026 16:15:43 PAGE 1   
+C51 COMPILER V9.60.7.0   MAIN                                                              06/14/2026 02:51:10 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MAIN
@@ -62,7 +62,7 @@ line level    source
   52   3                  cnt_500ms = 0;
   53   3                  Task_500ms();
   54   3              }
-C51 COMPILER V9.60.7.0   MAIN                                                              03/12/2026 16:15:43 PAGE 2   
+C51 COMPILER V9.60.7.0   MAIN                                                              06/14/2026 02:51:10 PAGE 2   
 
   55   2      
   56   2              /* 1000ms 任务 */

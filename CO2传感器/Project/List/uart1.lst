@@ -1,10 +1,10 @@
-C51 COMPILER V9.56.0.0   UART1                                                             12/22/2025 21:51:23 PAGE 1   
+C51 COMPILER V9.60.7.0   UART1                                                             06/14/2026 02:50:40 PAGE 1   
 
 
-C51 COMPILER V9.56.0.0, COMPILATION OF MODULE UART1
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE UART1
 OBJECT MODULE PLACED IN ..\hex文件\uart1.obj
-COMPILER INVOKED BY: E:\BaiduNetdiskDownload\KEIL C51\C51\BIN\C51.EXE ..\App\uart1.c LARGE OPTIMIZE(8,SPEED) BROWSE INCD
-                    -IR(..\User;..\App) DEBUG OBJECTEXTEND PRINT(.\List\uart1.lst) TABS(2) OBJECT(..\hex文件\uart1.obj)
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE ..\App\uart1.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App) DEB
+                    -UG OBJECTEXTEND PRINT(.\List\uart1.lst) TABS(2) OBJECT(..\hex文件\uart1.obj)
 
 line level    source
 
@@ -62,7 +62,7 @@ line level    source
   52   1        AUXR &= ~0x01;      //S1 BRT Use Timer1;
   53   1        AUXR |=  (1<<6);    //Timer1 set as 1T mode
   54   1        TMOD &= ~(1<<6);    //Timer1 set As Timer
-C51 COMPILER V9.56.0.0   UART1                                                             12/22/2025 21:51:23 PAGE 2   
+C51 COMPILER V9.60.7.0   UART1                                                             06/14/2026 02:50:40 PAGE 2   
 
   55   1        TMOD &= ~0x30;      //Timer1_16bitAutoReload;
   56   1        TH1 = (u8)((65536UL - (FOSC / 4) / BAUD1) / 256);

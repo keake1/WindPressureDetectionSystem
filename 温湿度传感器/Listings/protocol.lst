@@ -1,4 +1,4 @@
-C51 COMPILER V9.60.7.0   PROTOCOL                                                          03/12/2026 16:14:44 PAGE 1   
+C51 COMPILER V9.60.7.0   PROTOCOL                                                          06/14/2026 02:51:10 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE PROTOCOL
@@ -62,7 +62,7 @@ line level    source
   52   2              return;
   53   2          }
   54   1      
-C51 COMPILER V9.60.7.0   PROTOCOL                                                          03/12/2026 16:14:44 PAGE 2   
+C51 COMPILER V9.60.7.0   PROTOCOL                                                          06/14/2026 02:51:10 PAGE 2   
 
   55   1          /* 判断地址是否匹配 */
   56   1          if(g_uart_rx_buf[0] != g_device_addr)
@@ -101,51 +101,52 @@ line level    source
   89   3                   */
   90   3                  tx_buf[0] = g_device_addr;
   91   3                  tx_buf[1] = PROTO_FUNC_03;
-  92   3                  tx_buf[2] = 4;
-  93   3                  tx_buf[3] = (unsigned char)((g_aht30.temperature >> 8) & 0xFF);
-  94   3                  tx_buf[4] = (unsigned char)(g_aht30.temperature & 0xFF);
-  95   3                  tx_buf[5] = (unsigned char)((g_aht30.humidity >> 8) & 0xFF);
-  96   3                  tx_buf[6] = (unsigned char)(g_aht30.humidity & 0xFF);
-  97   3      
-  98   3                  crc_tx    = CRC16(tx_buf, 7);
-  99   3                  tx_buf[7] = (unsigned char)(crc_tx & 0xFF);        /* CRC低字节 */
- 100   3                  tx_buf[8] = (unsigned char)((crc_tx >> 8) & 0xFF); /* CRC高字节 */
- 101   3      
- 102   3                  Uart1_SendBuffer(tx_buf, 9);
- 103   3                  break;
- 104   3              }
- 105   2              case PROTO_FUNC_06:
- 106   2              {
- 107   3                  /*
- 108   3                   * 0x06 写控制命令
- 109   3                   * [2~3] 寄存器地址：0x00 0x04
- 110   3                   * [4~5] 写入值：0x00 0x01=点亮红灯  0x00 0x00=熄灭红灯
- 111   3                   * 应答：原帧回显（8字节）
- 112   3                   */
- 113   3                  unsigned int reg_addr = (unsigned int)g_uart_rx_buf[2] << 8 | g_uart_rx_buf[3];
- 114   3                  unsigned int reg_val  = (unsigned int)g_uart_rx_buf[4] << 8 | g_uart_rx_buf[5];
- 115   3      
- 116   3                  if(reg_addr == 0x0004)
-C51 COMPILER V9.60.7.0   PROTOCOL                                                          03/12/2026 16:14:44 PAGE 3   
+  92   3                  tx_buf[2] = 5;
+  93   3                  tx_buf[3] = 0x05;//型号
+  94   3                  tx_buf[4] = (unsigned char)((g_aht30.temperature >> 8) & 0xFF);
+  95   3                  tx_buf[5] = (unsigned char)(g_aht30.temperature & 0xFF);
+  96   3                  tx_buf[6] = (unsigned char)((g_aht30.humidity >> 8) & 0xFF);
+  97   3                  tx_buf[7] = (unsigned char)(g_aht30.humidity & 0xFF);
+  98   3      
+  99   3                  crc_tx    = CRC16(tx_buf, 8);
+ 100   3                  tx_buf[8] = (unsigned char)(crc_tx & 0xFF);        /* CRC低字节 */
+ 101   3                  tx_buf[9] = (unsigned char)((crc_tx >> 8) & 0xFF); /* CRC高字节 */
+ 102   3      
+ 103   3                  Uart1_SendBuffer(tx_buf, 10);
+ 104   3                  break;
+ 105   3              }
+ 106   2              case PROTO_FUNC_06:
+ 107   2              {
+ 108   3                  /*
+ 109   3                   * 0x06 写控制命令
+ 110   3                   * [2~3] 寄存器地址：0x00 0x04
+ 111   3                   * [4~5] 写入值：0x00 0x01=点亮红灯  0x00 0x00=熄灭红灯
+ 112   3                   * 应答：原帧回显（8字节）
+ 113   3                   */
+ 114   3                  unsigned int reg_addr = (unsigned int)g_uart_rx_buf[2] << 8 | g_uart_rx_buf[3];
+ 115   3                  unsigned int reg_val  = (unsigned int)g_uart_rx_buf[4] << 8 | g_uart_rx_buf[5];
+ 116   3      
+C51 COMPILER V9.60.7.0   PROTOCOL                                                          06/14/2026 02:51:10 PAGE 3   
 
- 117   3                  {
- 118   4                      if(reg_val == 0x0001)       LED_RED_ON();    /* 点亮红灯 */
- 119   4                      else if(reg_val == 0x0000)  LED_RED_OFF();   /* 熄灭红灯 */
- 120   4                  }
- 121   3                  break;
- 122   3              }
- 123   2              default:
- 124   2                  break;
- 125   2          }
- 126   1      
- 127   1          /* 清空接收缓冲区 */
- 128   1          g_uart_rx_flag = 0;
- 129   1          g_uart_rx_len  = 0;
- 130   1      }
+ 117   3                  if(reg_addr == 0x0004)
+ 118   3                  {
+ 119   4                      if(reg_val == 0x0001)       LED_RED_ON();    /* 点亮红灯 */
+ 120   4                      else if(reg_val == 0x0000)  LED_RED_OFF();   /* 熄灭红灯 */
+ 121   4                  }
+ 122   3                  break;
+ 123   3              }
+ 124   2              default:
+ 125   2                  break;
+ 126   2          }
+ 127   1      
+ 128   1          /* 清空接收缓冲区 */
+ 129   1          g_uart_rx_flag = 0;
+ 130   1          g_uart_rx_len  = 0;
+ 131   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =    262    ----
+   CODE SIZE        =    265    ----
    CONSTANT SIZE    =   ----    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =   ----    ----

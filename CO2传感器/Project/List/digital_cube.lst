@@ -1,10 +1,10 @@
-C51 COMPILER V9.56.0.0   DIGITAL_CUBE                                                      12/22/2025 21:51:24 PAGE 1   
+C51 COMPILER V9.60.7.0   DIGITAL_CUBE                                                      06/14/2026 02:50:40 PAGE 1   
 
 
-C51 COMPILER V9.56.0.0, COMPILATION OF MODULE DIGITAL_CUBE
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE DIGITAL_CUBE
 OBJECT MODULE PLACED IN ..\hexÎÄ¼þ\digital_cube.obj
-COMPILER INVOKED BY: E:\BaiduNetdiskDownload\KEIL C51\C51\BIN\C51.EXE ..\App\digital_cube.c LARGE OPTIMIZE(8,SPEED) BROW
-                    -SE INCDIR(..\User;..\App) DEBUG OBJECTEXTEND PRINT(.\List\digital_cube.lst) TABS(2) OBJECT(..\hexÎÄ¼þ\digital_cube.obj)
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE ..\App\digital_cube.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\A
+                    -pp) DEBUG OBJECTEXTEND PRINT(.\List\digital_cube.lst) TABS(2) OBJECT(..\hexÎÄ¼þ\digital_cube.obj)
 
 line level    source
 
@@ -62,7 +62,7 @@ line level    source
   52   1          P2M0 |= 0x01 << 6;
   53   1          P2M1 &= ~(0x01 << 6);
   54   1          P26 = 0;  // DIG2
-C51 COMPILER V9.56.0.0   DIGITAL_CUBE                                                      12/22/2025 21:51:24 PAGE 2   
+C51 COMPILER V9.60.7.0   DIGITAL_CUBE                                                      06/14/2026 02:50:40 PAGE 2   
 
   55   1      
   56   1          // ï¿½ï¿½ï¿½ï¿½P2.3Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
@@ -126,7 +126,7 @@ line level    source
  114          
  115          void Digital_Tube_Show(unsigned char num, unsigned char loc)
  116          {
-C51 COMPILER V9.56.0.0   DIGITAL_CUBE                                                      12/22/2025 21:51:24 PAGE 3   
+C51 COMPILER V9.60.7.0   DIGITAL_CUBE                                                      06/14/2026 02:50:40 PAGE 3   
 
  117   1        
  118   1        P01 = 1;
@@ -190,7 +190,7 @@ line level    source
  176          void Digital_Tube_flash(void)
  177          {
  178   1        
-C51 COMPILER V9.56.0.0   DIGITAL_CUBE                                                      12/22/2025 21:51:24 PAGE 4   
+C51 COMPILER V9.60.7.0   DIGITAL_CUBE                                                      06/14/2026 02:50:40 PAGE 4   
 
  179   1        static unsigned char p = 0;
  180   1        Digital_Tube_Show(display_buf[p], p);
