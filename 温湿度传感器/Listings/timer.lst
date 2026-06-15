@@ -1,4 +1,4 @@
-C51 COMPILER V9.60.7.0   TIMER                                                             06/14/2026 02:51:10 PAGE 1   
+C51 COMPILER V9.60.7.0   TIMER                                                             06/16/2026 01:19:57 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE TIMER
@@ -13,11 +13,11 @@ line level    source
    3          #include "task.h"
    4          
    5          /*
-   6           * 定时器0 配置（@24MHz，1T模式，模式0 16位自动重载）
-   7           * 重载值 = 65536 - 24000000 / 1000 = 65536 - 24000 = 41536 = 0xA200
-   8           * 定时周期：1ms
+   6           * 定时器0 配置（@11.0592MHz，1T模式，模式0 16位自动重载）
+   7           * 重载值 = 65536 - 11059200 / 1000 = 65536 - 11059 = 54477 = 0xD4CD
+   8           * 定时周期：1ms（≈0.9999ms，误差 0.0018%，可忽略）
    9           */
-  10          #define TIMER0_RELOAD  0xA200
+  10          #define TIMER0_RELOAD  0xD4CD
   11          
   12          /* 各任务计数器定义 */
   13          unsigned int cnt_10ms   = 0;
@@ -62,7 +62,7 @@ MODULE INFORMATION:   STATIC OVERLAYABLE
    HDATA SIZE       =   ----    ----
    XDATA CONST SIZE =   ----    ----
    FAR CONST SIZE   =   ----    ----
-C51 COMPILER V9.60.7.0   TIMER                                                             06/14/2026 02:51:10 PAGE 2   
+C51 COMPILER V9.60.7.0   TIMER                                                             06/16/2026 01:19:57 PAGE 2   
 
 END OF MODULE INFORMATION.
 

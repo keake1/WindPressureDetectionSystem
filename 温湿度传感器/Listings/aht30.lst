@@ -1,4 +1,4 @@
-C51 COMPILER V9.60.7.0   AHT30                                                             06/14/2026 02:51:10 PAGE 1   
+C51 COMPILER V9.60.7.0   AHT30                                                             06/16/2026 01:19:57 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE AHT30
@@ -62,7 +62,7 @@ line level    source
   52           * 需在 AHT30_Measure() 后等待约 80ms 再调用
   53           * 返回 0：成功；返回 1：忙/未校准/ACK异常
   54           *
-C51 COMPILER V9.60.7.0   AHT30                                                             06/14/2026 02:51:10 PAGE 2   
+C51 COMPILER V9.60.7.0   AHT30                                                             06/16/2026 01:19:57 PAGE 2   
 
   55           * 原始数据格式（7字节）：
   56           *   Byte0       : 状态字节，bit7=Busy，bit3~4必须=11(已校准)
@@ -126,7 +126,7 @@ MODULE INFORMATION:   STATIC OVERLAYABLE
    EDATA SIZE       =   ----    ----
    HDATA SIZE       =   ----    ----
    XDATA CONST SIZE =   ----    ----
-C51 COMPILER V9.60.7.0   AHT30                                                             06/14/2026 02:51:10 PAGE 3   
+C51 COMPILER V9.60.7.0   AHT30                                                             06/16/2026 01:19:57 PAGE 3   
 
    FAR CONST SIZE   =   ----    ----
 END OF MODULE INFORMATION.
