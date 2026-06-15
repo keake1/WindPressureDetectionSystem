@@ -4,11 +4,11 @@
 /*
  * 波特率发生器：定时器2，1T模式
  * 重载值 = 65536 - FOSC / (4 * 波特率)
- *        = 65536 - 24000000 / (4 * 9600)
- *        = 65536 - 625
- *        = 64911 = 0xFD8F
+ *        = 65536 - 11059200 / (4 * 9600)
+ *        = 65536 - 288
+ *        = 65248 = 0xFEE0
  */
-#define UART1_BAUD_RELOAD   0xFD8F
+#define UART1_BAUD_RELOAD   0xFEE0
 
 /* 接收缓冲区及状态变量 */
 unsigned char g_uart_rx_buf[UART_RX_BUF_SIZE] = {0};

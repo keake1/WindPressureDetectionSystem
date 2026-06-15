@@ -15,7 +15,7 @@
         <TargetCommonOption>
           <Device>STC8H1K28 Series</Device>
           <Vendor>STC</Vendor>
-          <Cpu>IRAM(0-0xFF) XRAM(0-0x03FF) IROM(0-0x6FF8) CLOCK(35000000)</Cpu>
+          <Cpu>IRAM(0-0xFF) XRAM(0-0x03FF) IROM(0-0x6FF8) CLOCK(11059200)</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
           <StartupFile>"LIB\STARTUP.A51" ("Standard 8051 Startup Code")</StartupFile>
           <FlashDriverDll></FlashDriverDll>

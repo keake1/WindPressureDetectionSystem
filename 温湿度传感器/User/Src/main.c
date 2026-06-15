@@ -11,7 +11,7 @@ void Delay1ms(void);
 void DelayMs(unsigned int ms);
 
 
-#define FOSC  24000000UL   /* 24 MHz，与 STC-ISP 中设置保持一致 */
+#define FOSC  11059200UL   /* 11.0592 MHz，与 STC-ISP 中设置保持一致 */
 
 void main()
 {
@@ -62,13 +62,13 @@ void main()
     }
 }
 
-void Delay1ms(void)	//@24.000MHz
+void Delay1ms(void)	//@11.0592MHz
 {
 	unsigned char data i, j;
 
 	_nop_();
-	i = 32;
-	j = 40;
+	i = 15;
+	j = 90;
 	do
 	{
 		while (--j);
