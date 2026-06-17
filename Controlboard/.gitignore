@@ -1,9 +1,4 @@
-.vscode/
 build/
-.clangd
-*.cfg
-*.sh
-*.json
 *.drawio
 *.markdown
 .drawio.bkp
