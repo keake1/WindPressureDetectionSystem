@@ -1,8 +1,8 @@
-LX51 LINKER/LOCATER V4.66.100.0                                                         06/16/2026  01:19:57  PAGE 1
+LX51 LINKER/LOCATER V4.66.100.0                                                         06/27/2026  19:59:00  PAGE 1
 
 
 LX51 LINKER/LOCATER V4.66.100.0, INVOKED BY:
-D:\KEIL_V5\C51\BIN\LX51.EXE .\Objects\STARTUP.obj, .\Objects\main.obj, .\Objects\gpio.obj, .\Objects\task.obj, .\Objects
+C:\KEIL_V5\C51\BIN\LX51.EXE .\Objects\STARTUP.obj, .\Objects\main.obj, .\Objects\gpio.obj, .\Objects\task.obj, .\Objects
 >> \timer.obj, .\Objects\uart.obj, .\Objects\aht30.obj, .\Objects\iic.obj, .\Objects\protocol.obj TO .\Objects\Tempertur
 >> eHumiditySensor PRINT (.\Listings\TempertureHumiditySensor.map)
 
@@ -30,15 +30,15 @@ INPUT MODULES INCLUDED:
          COMMENT TYPE 0: C51 V9.60.7.0
   .\Objects\protocol.obj (PROTOCOL)
          COMMENT TYPE 0: C51 V9.60.7.0
-  D:\KEIL_V5\C51\LIB\C51S.LIB (?C_INIT)
+  C:\KEIL_V5\C51\LIB\C51S.LIB (?C_INIT)
          COMMENT TYPE 1: A51 / ASM51 Assembler
-  D:\KEIL_V5\C51\LIB\C51S.LIB (?C?CLDOPTR)
+  C:\KEIL_V5\C51\LIB\C51S.LIB (?C?CLDOPTR)
          COMMENT TYPE 1: A51 / ASM51 Assembler
-  D:\KEIL_V5\C51\LIB\C51S.LIB (?C?LMUL)
+  C:\KEIL_V5\C51\LIB\C51S.LIB (?C?LMUL)
          COMMENT TYPE 1: A51 / ASM51 Assembler
-  D:\KEIL_V5\C51\LIB\C51S.LIB (?C?ULDIV)
+  C:\KEIL_V5\C51\LIB\C51S.LIB (?C?ULDIV)
          COMMENT TYPE 1: A51 / ASM51 Assembler
-  D:\KEIL_V5\C51\LIB\C51S.LIB (?C?LSHL)
+  C:\KEIL_V5\C51\LIB\C51S.LIB (?C?LSHL)
          COMMENT TYPE 1: A51 / ASM51 Assembler
 
 
@@ -67,7 +67,7 @@ START     STOP      LENGTH    ALIGN  RELOC    MEMORY CLASS   SEGMENT NAME
 00007CH   00007CH   000001H   BYTE   UNIT     IDATA          ?STACK
 
 * * * * * * * * * * *   C O D E   M E M O R Y   * * * * * * * * * * * * *
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 2
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 2
 
 
 000000H   000002H   000003H   ---    OFFS..   CODE           ?CO?STARTUP?3
@@ -135,7 +135,7 @@ MAIN/MAIN                      ----- -----  ----- -----
 
 GPIO_INIT/GPIO                 ----- -----  ----- -----
 
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 3
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 3
 
 
 UART1_INIT/UART                ----- -----  ----- -----
@@ -203,7 +203,7 @@ AHT30_READ/AHT30               ----- -----  004BH 0059H
 
 _IIC_RECVBYTE/IIC              ----- -----  ----- -----
   +--> _IIC_DELAY/IIC
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 4
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 4
 
 
 
@@ -270,15 +270,15 @@ PUBLIC SYMBOLS OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
 *SFR* 000000BDH   DATA     BYTE      ADC_RES
 *SFR* 000000BEH   DATA     BYTE      ADC_RESL
 *SFR* 000000DEH   DATA     BYTE      ADCCFG
-*SFR* 00000090H.5 DATA     BIT       ADDR_BIT0
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 5
+*SFR* 00000080H.2 DATA     BIT       ADDR_BIT0
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 5
 
 
-*SFR* 00000090H.4 DATA     BIT       ADDR_BIT1
-*SFR* 00000090H.3 DATA     BIT       ADDR_BIT2
-*SFR* 00000090H.2 DATA     BIT       ADDR_BIT3
-*SFR* 00000080H.3 DATA     BIT       ADDR_BIT4
-*SFR* 00000080H.2 DATA     BIT       ADDR_BIT5
+*SFR* 00000080H.3 DATA     BIT       ADDR_BIT1
+*SFR* 00000090H.2 DATA     BIT       ADDR_BIT2
+*SFR* 00000090H.3 DATA     BIT       ADDR_BIT3
+*SFR* 00000090H.4 DATA     BIT       ADDR_BIT4
+*SFR* 00000090H.5 DATA     BIT       ADDR_BIT5
       010006D1H   CODE     ---       AHT30_Init
       010005FAH   CODE     ---       AHT30_Measure
       01000183H   CODE     ---       AHT30_Read
@@ -339,7 +339,7 @@ PUBLIC SYMBOLS OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       0100078CH   CODE     ---       IIC_Init
 *SFR* 000000B0H.2 DATA     BIT       IIC_SCL
 *SFR* 000000B0H.3 DATA     BIT       IIC_SDA
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 6
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 6
 
 
       01000750H   CODE     ---       IIC_Start
@@ -407,7 +407,7 @@ PUBLIC SYMBOLS OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
 *SFR* 000000B0H.3 DATA     BIT       P33
 *SFR* 000000B0H.4 DATA     BIT       P34
 *SFR* 000000B0H.5 DATA     BIT       P35
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 7
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 7
 
 
 *SFR* 000000B0H.6 DATA     BIT       P36
@@ -475,7 +475,7 @@ PUBLIC SYMBOLS OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
 *SFR* 00000098H.2 DATA     BIT       RB8
 *SFR* 000000B0H.7 DATA     BIT       RD
       010006ABH   CODE     ---       Read_DeviceAddr
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 8
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 8
 
 
 *SFR* 00000098H.4 DATA     BIT       REN
@@ -543,7 +543,7 @@ PUBLIC SYMBOLS OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       010005C8H   CODE     ---       Uart1_ISR
       0100077AH   CODE     ---       Uart1_RxTimeoutTick
 *SFR* 000000FCH   DATA     BYTE      USBADR
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 9
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 9
 
 
 *SFR* 000000DCH   DATA     BYTE      USBCLK
@@ -611,7 +611,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       00000080H   SFRSYM    DATA     BYTE      P0
       000000B2H   SFRSYM    DATA     BYTE      P3M0
       00000095H   SFRSYM    DATA     BYTE      P2M1
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 10
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 10
 
 
       00000090H   SFRSYM    DATA     BYTE      P1
@@ -638,18 +638,18 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000AAH   SFRSYM    DATA     BYTE      WKTCL
       000000CEH   SFRSYM    DATA     BYTE      SPCTL
       000000A2H   SFRSYM    DATA     BYTE      P_SW1
-      00000090H.5 SFRSYM    DATA     BIT       ADDR_BIT0
+      00000080H.2 SFRSYM    DATA     BIT       ADDR_BIT0
       000000BAH   SFRSYM    DATA     BYTE      P_SW2
-      00000090H.4 SFRSYM    DATA     BIT       ADDR_BIT1
+      00000080H.3 SFRSYM    DATA     BIT       ADDR_BIT1
       000000E5H   SFRSYM    DATA     BYTE      DPH1
       000000A8H.5 SFRSYM    DATA     BIT       EADC
       000000A8H   SFRSYM    DATA     BYTE      IE
       000000B0H.3 SFRSYM    DATA     BIT       IIC_SDA
-      00000090H.3 SFRSYM    DATA     BIT       ADDR_BIT2
-      00000090H.2 SFRSYM    DATA     BIT       ADDR_BIT3
+      00000090H.2 SFRSYM    DATA     BIT       ADDR_BIT2
+      00000090H.3 SFRSYM    DATA     BIT       ADDR_BIT3
       000000C5H   SFRSYM    DATA     BYTE      IAP_CMD
-      00000080H.3 SFRSYM    DATA     BIT       ADDR_BIT4
-      00000080H.2 SFRSYM    DATA     BIT       ADDR_BIT5
+      00000090H.4 SFRSYM    DATA     BIT       ADDR_BIT4
+      00000090H.5 SFRSYM    DATA     BIT       ADDR_BIT5
       000000B0H.4 SFRSYM    DATA     BIT       LED_RED
       000000E4H   SFRSYM    DATA     BYTE      DPL1
       000000BDH   SFRSYM    DATA     BYTE      ADC_RES
@@ -679,7 +679,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000E7H   SFRSYM    DATA     BYTE      CMPCR2
       000000B0H.6 SFRSYM    DATA     BIT       WR
       000000A8H.6 SFRSYM    DATA     BIT       ELVD
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 11
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 11
 
 
       00000080H.0 SFRSYM    DATA     BIT       P00
@@ -747,7 +747,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000F8H.4 SFRSYM    DATA     BIT       P74
       000000E8H.5 SFRSYM    DATA     BIT       P65
       000000C8H.6 SFRSYM    DATA     BIT       P56
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 12
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 12
 
 
       000000C0H.7 SFRSYM    DATA     BIT       P47
@@ -815,7 +815,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       0000009FH   SFRSYM    DATA     BYTE      IRTRIM
       00000083H   SFRSYM    DATA     BYTE      DPH
       000000D1H   SFRSYM    DATA     BYTE      T3T4M
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 13
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 13
 
 
       000000D1H   SFRSYM    DATA     BYTE      T4T3M
@@ -883,7 +883,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       0100041BH   LINE      CODE     ---       #36
       01000426H   LINE      CODE     ---       #37
       01000426H   LINE      CODE     ---       #38
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 14
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 14
 
 
       0100042BH   LINE      CODE     ---       #39
@@ -951,7 +951,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000B4H   SFRSYM    DATA     BYTE      P4M0
       000000B1H   SFRSYM    DATA     BYTE      P3M1
       000000A0H   SFRSYM    DATA     BYTE      P2
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 15
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 15
 
 
       000000CAH   SFRSYM    DATA     BYTE      P5M0
@@ -974,17 +974,17 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000AAH   SFRSYM    DATA     BYTE      WKTCL
       000000CEH   SFRSYM    DATA     BYTE      SPCTL
       000000A2H   SFRSYM    DATA     BYTE      P_SW1
-      00000090H.5 SFRSYM    DATA     BIT       ADDR_BIT0
+      00000080H.2 SFRSYM    DATA     BIT       ADDR_BIT0
       000000BAH   SFRSYM    DATA     BYTE      P_SW2
-      00000090H.4 SFRSYM    DATA     BIT       ADDR_BIT1
+      00000080H.3 SFRSYM    DATA     BIT       ADDR_BIT1
       000000E5H   SFRSYM    DATA     BYTE      DPH1
       000000A8H.5 SFRSYM    DATA     BIT       EADC
       000000A8H   SFRSYM    DATA     BYTE      IE
-      00000090H.3 SFRSYM    DATA     BIT       ADDR_BIT2
-      00000090H.2 SFRSYM    DATA     BIT       ADDR_BIT3
+      00000090H.2 SFRSYM    DATA     BIT       ADDR_BIT2
+      00000090H.3 SFRSYM    DATA     BIT       ADDR_BIT3
       000000C5H   SFRSYM    DATA     BYTE      IAP_CMD
-      00000080H.3 SFRSYM    DATA     BIT       ADDR_BIT4
-      00000080H.2 SFRSYM    DATA     BIT       ADDR_BIT5
+      00000090H.4 SFRSYM    DATA     BIT       ADDR_BIT4
+      00000090H.5 SFRSYM    DATA     BIT       ADDR_BIT5
       000000B0H.4 SFRSYM    DATA     BIT       LED_RED
       000000E4H   SFRSYM    DATA     BYTE      DPL1
       000000BDH   SFRSYM    DATA     BYTE      ADC_RES
@@ -1019,7 +1019,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       00000090H.0 SFRSYM    DATA     BIT       P10
       00000087H   SFRSYM    DATA     BYTE      PCON
       00000080H.1 SFRSYM    DATA     BIT       P01
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 16
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 16
 
 
       000000A0H.0 SFRSYM    DATA     BIT       P20
@@ -1087,7 +1087,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000C8H.7 SFRSYM    DATA     BIT       P57
       000000F8H.6 SFRSYM    DATA     BIT       P76
       000000E8H.7 SFRSYM    DATA     BIT       P67
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 17
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 17
 
 
       000000F8H.7 SFRSYM    DATA     BIT       P77
@@ -1155,7 +1155,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000CDH   SFRSYM    DATA     BYTE      SPSTAT
       000000B7H   SFRSYM    DATA     BYTE      IPH
       000000EDH   SFRSYM    DATA     BYTE      MDU32CR
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 18
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 18
 
 
       0000009BH   SFRSYM    DATA     BYTE      S2BUF
@@ -1197,50 +1197,50 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       00000094H   SFRSYM    DATA     BYTE      P0M0
 
       0100062CH   BLOCK     CODE     ---       LVL=0
-      0100062CH   LINE      CODE     ---       #23
-      0100062CH   LINE      CODE     ---       #24
-      0100062CH   LINE      CODE     ---       #26
-      0100062FH   LINE      CODE     ---       #27
-      01000632H   LINE      CODE     ---       #28
-      01000634H   LINE      CODE     ---       #31
-      01000637H   LINE      CODE     ---       #32
-      0100063AH   LINE      CODE     ---       #33
-      0100063CH   LINE      CODE     ---       #36
-      0100063FH   LINE      CODE     ---       #37
-      01000642H   LINE      CODE     ---       #40
-      01000645H   LINE      CODE     ---       #41
-      01000648H   LINE      CODE     ---       #44
-      0100064BH   LINE      CODE     ---       #45
-      01000652H   LINE      CODE     ---       #46
-      01000657H   LINE      CODE     ---       #47
-      0100065AH   LINE      CODE     ---       #48
+      0100062CH   LINE      CODE     ---       #27
+      0100062CH   LINE      CODE     ---       #28
+      0100062CH   LINE      CODE     ---       #30
+      0100062FH   LINE      CODE     ---       #31
+      01000632H   LINE      CODE     ---       #32
+      01000634H   LINE      CODE     ---       #35
+      01000637H   LINE      CODE     ---       #36
+      0100063AH   LINE      CODE     ---       #37
+      0100063CH   LINE      CODE     ---       #40
+      0100063FH   LINE      CODE     ---       #41
+      01000642H   LINE      CODE     ---       #44
+      01000645H   LINE      CODE     ---       #45
+      01000648H   LINE      CODE     ---       #48
+      0100064BH   LINE      CODE     ---       #49
+      01000652H   LINE      CODE     ---       #50
+      01000657H   LINE      CODE     ---       #51
+      0100065AH   LINE      CODE     ---       #52
       ---         BLOCKEND  ---      ---       LVL=0
 
       010007C5H   BLOCK     CODE     ---       LVL=0
-      010007C5H   LINE      CODE     ---       #51
-      010007C5H   LINE      CODE     ---       #52
-      010007C5H   LINE      CODE     ---       #53
-      010007C8H   LINE      CODE     ---       #54
+      010007C5H   LINE      CODE     ---       #55
+      010007C5H   LINE      CODE     ---       #56
+      010007C5H   LINE      CODE     ---       #57
+      010007C8H   LINE      CODE     ---       #58
       ---         BLOCKEND  ---      ---       LVL=0
 
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 19
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 19
 
 
       010006ABH   BLOCK     CODE     ---       LVL=0
       010006ABH   BLOCK     CODE     NEAR LAB  LVL=1
       00000007H   SYMBOL    DATA     BYTE      addr
       ---         BLOCKEND  ---      ---       LVL=1
-      010006ABH   LINE      CODE     ---       #61
-      010006ABH   LINE      CODE     ---       #62
-      010006ABH   LINE      CODE     ---       #63
-      010006ADH   LINE      CODE     ---       #65
-      010006B2H   LINE      CODE     ---       #66
-      010006B8H   LINE      CODE     ---       #67
-      010006BEH   LINE      CODE     ---       #68
-      010006C4H   LINE      CODE     ---       #69
-      010006CAH   LINE      CODE     ---       #70
-      010006D0H   LINE      CODE     ---       #72
-      010006D0H   LINE      CODE     ---       #73
+      010006ABH   LINE      CODE     ---       #66
+      010006ABH   LINE      CODE     ---       #67
+      010006ABH   LINE      CODE     ---       #68
+      010006ADH   LINE      CODE     ---       #70
+      010006B2H   LINE      CODE     ---       #71
+      010006B8H   LINE      CODE     ---       #72
+      010006BEH   LINE      CODE     ---       #73
+      010006C4H   LINE      CODE     ---       #74
+      010006CAH   LINE      CODE     ---       #75
+      010006D0H   LINE      CODE     ---       #77
+      010006D0H   LINE      CODE     ---       #78
       ---         BLOCKEND  ---      ---       LVL=0
 
       ---         MODULE    ---      ---       TASK
@@ -1283,20 +1283,20 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000AAH   SFRSYM    DATA     BYTE      WKTCL
       000000CEH   SFRSYM    DATA     BYTE      SPCTL
       000000A2H   SFRSYM    DATA     BYTE      P_SW1
-      00000090H.5 SFRSYM    DATA     BIT       ADDR_BIT0
+      00000080H.2 SFRSYM    DATA     BIT       ADDR_BIT0
       000000BAH   SFRSYM    DATA     BYTE      P_SW2
-      00000090H.4 SFRSYM    DATA     BIT       ADDR_BIT1
+      00000080H.3 SFRSYM    DATA     BIT       ADDR_BIT1
       000000E5H   SFRSYM    DATA     BYTE      DPH1
       000000A8H.5 SFRSYM    DATA     BIT       EADC
       000000A8H   SFRSYM    DATA     BYTE      IE
-      00000090H.3 SFRSYM    DATA     BIT       ADDR_BIT2
-      00000090H.2 SFRSYM    DATA     BIT       ADDR_BIT3
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 20
+      00000090H.2 SFRSYM    DATA     BIT       ADDR_BIT2
+      00000090H.3 SFRSYM    DATA     BIT       ADDR_BIT3
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 20
 
 
       000000C5H   SFRSYM    DATA     BYTE      IAP_CMD
-      00000080H.3 SFRSYM    DATA     BIT       ADDR_BIT4
-      00000080H.2 SFRSYM    DATA     BIT       ADDR_BIT5
+      00000090H.4 SFRSYM    DATA     BIT       ADDR_BIT4
+      00000090H.5 SFRSYM    DATA     BIT       ADDR_BIT5
       000000B0H.4 SFRSYM    DATA     BIT       LED_RED
       000000E4H   SFRSYM    DATA     BYTE      DPL1
       000000BDH   SFRSYM    DATA     BYTE      ADC_RES
@@ -1359,7 +1359,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000B0H.3 SFRSYM    DATA     BIT       P33
       000000A0H.4 SFRSYM    DATA     BIT       P24
       00000090H.5 SFRSYM    DATA     BIT       P15
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 21
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 21
 
 
       00000080H.6 SFRSYM    DATA     BIT       P06
@@ -1427,7 +1427,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000D6H   SFRSYM    DATA     BYTE      TH2
       000000D6H   SFRSYM    DATA     BYTE      T2H
       000000A8H.2 SFRSYM    DATA     BIT       EX1
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 22
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 22
 
 
       00000098H.3 SFRSYM    DATA     BIT       TB8
@@ -1495,7 +1495,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000F0H.6 SFRSYM    DATA     BIT       B6
       000000E0H.0 SFRSYM    DATA     BIT       ACC0
       000000F0H.7 SFRSYM    DATA     BIT       B7
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 23
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 23
 
 
       000000E0H.1 SFRSYM    DATA     BIT       ACC1
@@ -1563,7 +1563,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       00000091H   SFRSYM    DATA     BYTE      P1M1
       00000080H   SFRSYM    DATA     BYTE      P0
       000000B2H   SFRSYM    DATA     BYTE      P3M0
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 24
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 24
 
 
       00000095H   SFRSYM    DATA     BYTE      P2M1
@@ -1631,7 +1631,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000A0H.0 SFRSYM    DATA     BIT       P20
       00000090H.1 SFRSYM    DATA     BIT       P11
       00000080H.2 SFRSYM    DATA     BIT       P02
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 25
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 25
 
 
       000000F5H   SFRSYM    DATA     BYTE      IAP_TPS
@@ -1699,7 +1699,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000F8H.7 SFRSYM    DATA     BIT       P77
       000000A1H   SFRSYM    DATA     BYTE      BUS_SPEED
       00000088H.1 SFRSYM    DATA     BIT       IE0
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 26
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 26
 
 
       00000088H.3 SFRSYM    DATA     BIT       IE1
@@ -1767,7 +1767,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       0000009BH   SFRSYM    DATA     BYTE      S2BUF
       000000ADH   SFRSYM    DATA     BYTE      S3BUF
       00000098H.4 SFRSYM    DATA     BIT       REN
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 27
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 27
 
 
       00000085H   SFRSYM    DATA     BYTE      S4BUF
@@ -1835,7 +1835,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       00000009H   PUBLIC    DATA     BYTE      g_uart_rx_flag
       00000008H   PUBLIC    DATA     BYTE      g_uart_rx_timeout
       0100077AH   PUBLIC    CODE     ---       Uart1_RxTimeoutTick
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 28
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 28
 
 
       010005C8H   PUBLIC    CODE     ---       Uart1_ISR
@@ -1903,7 +1903,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000D0H.2 SFRSYM    DATA     BIT       OV
       0000009EH   SFRSYM    DATA     BYTE      LIRTRIM
       000000E6H   SFRSYM    DATA     BYTE      CMPCR1
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 29
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 29
 
 
       000000E7H   SFRSYM    DATA     BYTE      CMPCR2
@@ -1971,7 +1971,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000C8H.5 SFRSYM    DATA     BIT       P55
       000000C0H.6 SFRSYM    DATA     BIT       P46
       000000B0H.7 SFRSYM    DATA     BIT       P37
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 30
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 30
 
 
       000000F8H.4 SFRSYM    DATA     BIT       P74
@@ -2039,7 +2039,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000C1H   SFRSYM    DATA     BYTE      WDT_CONTR
       000000B8H.0 SFRSYM    DATA     BIT       PX0
       000000B8H.2 SFRSYM    DATA     BIT       PX1
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 31
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 31
 
 
       0000009FH   SFRSYM    DATA     BYTE      IRTRIM
@@ -2107,7 +2107,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       00000007H   SYMBOL    DATA     BYTE      dat
       01000003H   LINE      CODE     ---       #44
       01000003H   LINE      CODE     ---       #45
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 32
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 32
 
 
       01000003H   LINE      CODE     ---       #46
@@ -2175,7 +2175,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       00000080H   SFRSYM    DATA     BYTE      P0
       000000B2H   SFRSYM    DATA     BYTE      P3M0
       00000095H   SFRSYM    DATA     BYTE      P2M1
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 33
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 33
 
 
       00000090H   SFRSYM    DATA     BYTE      P1
@@ -2243,7 +2243,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       00000080H.1 SFRSYM    DATA     BIT       P01
       000000A0H.0 SFRSYM    DATA     BIT       P20
       00000090H.1 SFRSYM    DATA     BIT       P11
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 34
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 34
 
 
       00000080H.2 SFRSYM    DATA     BIT       P02
@@ -2311,7 +2311,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000E8H.7 SFRSYM    DATA     BIT       P67
       000000F8H.7 SFRSYM    DATA     BIT       P77
       000000A1H   SFRSYM    DATA     BYTE      BUS_SPEED
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 35
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 35
 
 
       00000088H.1 SFRSYM    DATA     BIT       IE0
@@ -2379,7 +2379,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000EDH   SFRSYM    DATA     BYTE      MDU32CR
       0000009BH   SFRSYM    DATA     BYTE      S2BUF
       000000ADH   SFRSYM    DATA     BYTE      S3BUF
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 36
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 36
 
 
       00000098H.4 SFRSYM    DATA     BIT       REN
@@ -2447,7 +2447,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       01000613H   LINE      CODE     ---       #40
       01000616H   LINE      CODE     ---       #41
       0100061BH   LINE      CODE     ---       #42
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 37
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 37
 
 
       0100061EH   LINE      CODE     ---       #43
@@ -2515,7 +2515,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000ABH   SFRSYM    DATA     BYTE      WKTCH
       000000D0H.6 SFRSYM    DATA     BIT       AC
       000000CCH   SFRSYM    DATA     BYTE      P6M0
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 38
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 38
 
 
       000000C9H   SFRSYM    DATA     BYTE      P5M1
@@ -2583,7 +2583,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000B0H.1 SFRSYM    DATA     BIT       P31
       000000A0H.2 SFRSYM    DATA     BIT       P22
       00000098H   SFRSYM    DATA     BYTE      SCON
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 39
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 39
 
 
       00000090H.3 SFRSYM    DATA     BIT       P13
@@ -2651,7 +2651,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000ECH   SFRSYM    DATA     BYTE      USBDAT
       000000DCH   SFRSYM    DATA     BYTE      USBCLK
       000000E0H   SFRSYM    DATA     BYTE      ACC
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 40
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 40
 
 
       000000A8H.1 SFRSYM    DATA     BIT       ET0
@@ -2719,7 +2719,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000EFH   SFRSYM    DATA     BYTE      AUXINTIF
       000000B9H   SFRSYM    DATA     BYTE      SADEN
       000000B0H.0 SFRSYM    DATA     BIT       RXD
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 41
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 41
 
 
       000000A9H   SFRSYM    DATA     BYTE      SADDR
@@ -2787,7 +2787,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       01000762H   LINE      CODE     ---       #43
       ---         BLOCKEND  ---      ---       LVL=0
 
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 42
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 42
 
 
       0100079BH   BLOCK     CODE     ---       LVL=0
@@ -2855,7 +2855,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       01000591H   BLOCK     CODE     NEAR LAB  LVL=1
       00000003H   SYMBOL    DATA     BYTE      i
       00000004H   SYMBOL    DATA     BYTE      dat
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 43
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 43
 
 
       ---         BLOCKEND  ---      ---       LVL=1
@@ -2922,20 +2922,20 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000AAH   SFRSYM    DATA     BYTE      WKTCL
       000000CEH   SFRSYM    DATA     BYTE      SPCTL
       000000A2H   SFRSYM    DATA     BYTE      P_SW1
-      00000090H.5 SFRSYM    DATA     BIT       ADDR_BIT0
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 44
+      00000080H.2 SFRSYM    DATA     BIT       ADDR_BIT0
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 44
 
 
       000000BAH   SFRSYM    DATA     BYTE      P_SW2
-      00000090H.4 SFRSYM    DATA     BIT       ADDR_BIT1
+      00000080H.3 SFRSYM    DATA     BIT       ADDR_BIT1
       000000E5H   SFRSYM    DATA     BYTE      DPH1
       000000A8H.5 SFRSYM    DATA     BIT       EADC
       000000A8H   SFRSYM    DATA     BYTE      IE
-      00000090H.3 SFRSYM    DATA     BIT       ADDR_BIT2
-      00000090H.2 SFRSYM    DATA     BIT       ADDR_BIT3
+      00000090H.2 SFRSYM    DATA     BIT       ADDR_BIT2
+      00000090H.3 SFRSYM    DATA     BIT       ADDR_BIT3
       000000C5H   SFRSYM    DATA     BYTE      IAP_CMD
-      00000080H.3 SFRSYM    DATA     BIT       ADDR_BIT4
-      00000080H.2 SFRSYM    DATA     BIT       ADDR_BIT5
+      00000090H.4 SFRSYM    DATA     BIT       ADDR_BIT4
+      00000090H.5 SFRSYM    DATA     BIT       ADDR_BIT5
       000000B0H.4 SFRSYM    DATA     BIT       LED_RED
       000000E4H   SFRSYM    DATA     BYTE      DPL1
       000000BDH   SFRSYM    DATA     BYTE      ADC_RES
@@ -2991,7 +2991,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       00000090H.4 SFRSYM    DATA     BIT       P14
       00000089H   SFRSYM    DATA     BYTE      TMOD
       00000088H   SFRSYM    DATA     BYTE      TCON
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 45
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 45
 
 
       00000080H.5 SFRSYM    DATA     BIT       P05
@@ -3059,7 +3059,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000F4H   SFRSYM    DATA     BYTE      USBCON
       000000DFH   SFRSYM    DATA     BYTE      IP3
       00000098H.2 SFRSYM    DATA     BIT       RB8
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 46
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 46
 
 
       0000008CH   SFRSYM    DATA     BYTE      TH0
@@ -3127,7 +3127,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       000000F0H.2 SFRSYM    DATA     BIT       B2
       000000F0H.3 SFRSYM    DATA     BIT       B3
       000000F0H.4 SFRSYM    DATA     BIT       B4
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 47
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 47
 
 
       000000D0H.5 SFRSYM    DATA     BIT       F0
@@ -3195,7 +3195,7 @@ SYMBOL TABLE OF MODULE:  .\Objects\TempertureHumiditySensor (?C_STARTUP)
       010002C3H   LINE      CODE     ---       #58
       010002C3H   LINE      CODE     ---       #59
       010002C6H   LINE      CODE     ---       #61
-LX51 LINKER/LOCATER V4.66.100.0                                                       06/16/2026  01:19:57  PAGE 48
+LX51 LINKER/LOCATER V4.66.100.0                                                       06/27/2026  19:59:00  PAGE 48
 
 
       010002C6H   LINE      CODE     ---       #64

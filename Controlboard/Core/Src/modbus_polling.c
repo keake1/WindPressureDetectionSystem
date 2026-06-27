@@ -141,14 +141,14 @@ void TaskModbusPoll(void *arg)
 
             /* ---- 新一轮开始前读取 ID1-ID8 DIP 开关（低电平=1） ---- */
             uint8_t dip = 0;
-            if (HAL_GPIO_ReadPin(ID1_GPIO_Port, ID1_Pin) == GPIO_PIN_RESET) dip |= 0x80;
-            if (HAL_GPIO_ReadPin(ID2_GPIO_Port, ID2_Pin) == GPIO_PIN_RESET) dip |= 0x40;
-            if (HAL_GPIO_ReadPin(ID3_GPIO_Port, ID3_Pin) == GPIO_PIN_RESET) dip |= 0x20;
-            if (HAL_GPIO_ReadPin(ID4_GPIO_Port, ID4_Pin) == GPIO_PIN_RESET) dip |= 0x10;
-            if (HAL_GPIO_ReadPin(ID5_GPIO_Port, ID5_Pin) == GPIO_PIN_RESET) dip |= 0x08;
-            if (HAL_GPIO_ReadPin(ID6_GPIO_Port, ID6_Pin) == GPIO_PIN_RESET) dip |= 0x04;
-            if (HAL_GPIO_ReadPin(ID7_GPIO_Port, ID7_Pin) == GPIO_PIN_RESET) dip |= 0x02;
-            if (HAL_GPIO_ReadPin(ID8_GPIO_Port, ID8_Pin) == GPIO_PIN_RESET) dip |= 0x01;
+            if (HAL_GPIO_ReadPin(ID8_GPIO_Port, ID8_Pin) == GPIO_PIN_RESET) dip |= 0x80;
+            if (HAL_GPIO_ReadPin(ID7_GPIO_Port, ID7_Pin) == GPIO_PIN_RESET) dip |= 0x40;
+            if (HAL_GPIO_ReadPin(ID6_GPIO_Port, ID6_Pin) == GPIO_PIN_RESET) dip |= 0x20;
+            if (HAL_GPIO_ReadPin(ID5_GPIO_Port, ID5_Pin) == GPIO_PIN_RESET) dip |= 0x10;
+            if (HAL_GPIO_ReadPin(ID4_GPIO_Port, ID4_Pin) == GPIO_PIN_RESET) dip |= 0x08;
+            if (HAL_GPIO_ReadPin(ID3_GPIO_Port, ID3_Pin) == GPIO_PIN_RESET) dip |= 0x04;
+            if (HAL_GPIO_ReadPin(ID2_GPIO_Port, ID2_Pin) == GPIO_PIN_RESET) dip |= 0x02;
+            if (HAL_GPIO_ReadPin(ID1_GPIO_Port, ID1_Pin) == GPIO_PIN_RESET) dip |= 0x01;
             ModbusReg_SetBoardAddr(dip);
 
             /* 完成一轮完整扫描 → 推进离线检测周期 */

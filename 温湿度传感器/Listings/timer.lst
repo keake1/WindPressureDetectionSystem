@@ -1,9 +1,9 @@
-C51 COMPILER V9.60.7.0   TIMER                                                             06/16/2026 01:19:57 PAGE 1   
+C51 COMPILER V9.60.7.0   TIMER                                                             06/27/2026 19:48:43 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE TIMER
 OBJECT MODULE PLACED IN .\Objects\timer.obj
-COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE User\Src\timer.c OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\User\Inc) DEBUG 
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE User\Src\timer.c OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\User\Inc) DEBUG 
                     -PRINT(.\Listings\timer.lst) TABS(2) OBJECT(.\Objects\timer.obj)
 
 line level    source
@@ -62,7 +62,7 @@ MODULE INFORMATION:   STATIC OVERLAYABLE
    HDATA SIZE       =   ----    ----
    XDATA CONST SIZE =   ----    ----
    FAR CONST SIZE   =   ----    ----
-C51 COMPILER V9.60.7.0   TIMER                                                             06/16/2026 01:19:57 PAGE 2   
+C51 COMPILER V9.60.7.0   TIMER                                                             06/27/2026 19:48:43 PAGE 2   
 
 END OF MODULE INFORMATION.
 

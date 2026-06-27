@@ -19,20 +19,20 @@ sbit LED_RED   = P3^4;
 
 /* -------------------------------------------------------
  * 地址拨码引脚定义（高阻输入模式）
- *   P0.2 -> bit5 最高位
- *   P0.3 -> bit4
- *   P1.2 -> bit3
- *   P1.3 -> bit2
- *   P1.4 -> bit1
- *   P1.5 -> bit0 最低位
+ *   P1.5 -> bit5 最高位
+ *   P1.4 -> bit4
+ *   P1.3 -> bit3
+ *   P1.2 -> bit2
+ *   P0.3 -> bit1
+ *   P0.2 -> bit0 最低位
  *   地址范围：0 ~ 63
  * ------------------------------------------------------- */
-sbit ADDR_BIT5 = P0^2;
-sbit ADDR_BIT4 = P0^3;
-sbit ADDR_BIT3 = P1^2;
-sbit ADDR_BIT2 = P1^3;
-sbit ADDR_BIT1 = P1^4;
-sbit ADDR_BIT0 = P1^5;
+sbit ADDR_BIT5 = P1^5;
+sbit ADDR_BIT4 = P1^4;
+sbit ADDR_BIT3 = P1^3;
+sbit ADDR_BIT2 = P1^2;
+sbit ADDR_BIT1 = P0^3;
+sbit ADDR_BIT0 = P0^2;
 
 extern unsigned char g_device_addr;   /* 设备地址（0~63） */
 

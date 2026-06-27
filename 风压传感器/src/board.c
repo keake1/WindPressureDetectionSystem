@@ -41,12 +41,12 @@ uint8_t Board_ReadAddress(void)
 {
     uint8_t addr = 0U;
 
-    if (P02 == 0) { addr |= 0x20U; }
-    if (P03 == 0) { addr |= 0x10U; }
-    if (P12 == 0) { addr |= 0x08U; }
-    if (P13 == 0) { addr |= 0x04U; }
-    if (P14 == 0) { addr |= 0x02U; }
-    if (P15 == 0) { addr |= 0x01U; }
+    if (P15 == 0) { addr |= 0x20U; }
+    if (P14 == 0) { addr |= 0x10U; }
+    if (P13 == 0) { addr |= 0x08U; }
+    if (P12 == 0) { addr |= 0x04U; }
+    if (P03 == 0) { addr |= 0x02U; }
+    if (P02 == 0) { addr |= 0x01U; }
 
     return addr;
 }

@@ -16,6 +16,10 @@
  * P1.3 高阻输入：P1M1 |=  0x08; P1M0 &= ~0x08;
  * P1.4 高阻输入：P1M1 |=  0x10; P1M0 &= ~0x10;
  * P1.5 高阻输入：P1M1 |=  0x20; P1M0 &= ~0x20;
+ *
+ * 地址位序（与其他传感器一致）：
+ *   P1.5 = bit5(最高位), P1.4 = bit4, P1.3 = bit3,
+ *   P1.2 = bit2, P0.3 = bit1, P0.2 = bit0(最低位)
  */
 
 unsigned char g_device_addr = 0;   /* 设备地址全局变量 */
@@ -56,18 +60,19 @@ void LED_GREEN_Toggle(void)
 /*
  * 读取拨码地址
  * 引脚低电平 -> 对应位为 1，高电平 -> 对应位为 0
+ * P1.5 最高位，P0.2 最低位
  * 返回值：0 ~ 63
  */
 unsigned char Read_DeviceAddr(void)
 {
     unsigned char addr = 0;
 
-    if(!ADDR_BIT5) addr |= 0x20;   /* P0.2 -> bit5 */
-    if(!ADDR_BIT4) addr |= 0x10;   /* P0.3 -> bit4 */
-    if(!ADDR_BIT3) addr |= 0x08;   /* P1.2 -> bit3 */
-    if(!ADDR_BIT2) addr |= 0x04;   /* P1.3 -> bit2 */
-    if(!ADDR_BIT1) addr |= 0x02;   /* P1.4 -> bit1 */
-    if(!ADDR_BIT0) addr |= 0x01;   /* P1.5 -> bit0 */
+    if(!ADDR_BIT5) addr |= 0x20;   /* P1.5 -> bit5 */
+    if(!ADDR_BIT4) addr |= 0x10;   /* P1.4 -> bit4 */
+    if(!ADDR_BIT3) addr |= 0x08;   /* P1.3 -> bit3 */
+    if(!ADDR_BIT2) addr |= 0x04;   /* P1.2 -> bit2 */
+    if(!ADDR_BIT1) addr |= 0x02;   /* P0.3 -> bit1 */
+    if(!ADDR_BIT0) addr |= 0x01;   /* P0.2 -> bit0 */
 
     return addr;
 }
