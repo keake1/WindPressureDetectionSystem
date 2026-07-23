@@ -32,7 +32,7 @@ unsigned int CRC16(unsigned char *buf, unsigned char len)
 void Protocol_Process(void)
 {
     unsigned int  crc_calc, crc_recv;
-    unsigned char tx_buf[9];
+    unsigned char tx_buf[10];
     unsigned int  crc_tx;
 
     /* 未收到数据 */
@@ -76,16 +76,17 @@ void Protocol_Process(void)
         case PROTO_FUNC_03:
         {
             /*
-             * 应答帧（9字节）：
+             * 应答帧（10字节）：
              *   [0]    设备地址
              *   [1]    功能码 0x03
-             *   [2]    数据字节数 = 4
-             *   [3]    温度高字节（×10，有符号）
-             *   [4]    温度低字节
-             *   [5]    湿度高字节（×10）
-             *   [6]    湿度低字节
-             *   [7]    CRC低字节
-             *   [8]    CRC高字节
+             *   [2]    数据字节数 = 5（型号 + 温度 + 湿度）
+             *   [3]    型号 = 0x05
+             *   [4]    温度高字节（×10，有符号）
+             *   [5]    温度低字节
+             *   [6]    湿度高字节（×10）
+             *   [7]    湿度低字节
+             *   [8]    CRC低字节
+             *   [9]    CRC高字节
              */
             tx_buf[0] = g_device_addr;
             tx_buf[1] = PROTO_FUNC_03;
