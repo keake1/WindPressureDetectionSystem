@@ -374,7 +374,9 @@ uint8_t ModbusReg_GetGlobalAlarmCoil(void)
 
 void ModbusReg_SetSmokeAlarm(uint8_t alarm)
 {
-    smoke_alarm_flag = (alarm != 0) ? 1 : 0;
+    /* 烟雾报警器当前未接入：无论 Isolator 输入为何值，均保持正常。 */
+    (void)alarm;
+    smoke_alarm_flag = 0;
 }
 
 uint8_t ModbusReg_GetSmokeAlarm(void)

@@ -1,7 +1,7 @@
-C51 COMPILER V9.59.0.0   MODEBUSRTU                                                        12/05/2025 19:14:57 PAGE 1   
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/26/2026 15:50:15 PAGE 1   
 
 
-C51 COMPILER V9.59.0.0, COMPILATION OF MODULE MODEBUSRTU
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MODEBUSRTU
 OBJECT MODULE PLACED IN ..\hex�ļ�\ModeBusRTU.obj
 COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\App\ModeBusRTU.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App
                     -) DEBUG OBJECTEXTEND PRINT(.\List\ModeBusRTU.lst) TABS(2) OBJECT(..\hex�ļ�\ModeBusRTU.obj)
@@ -62,7 +62,7 @@ line level    source
   52   1              sum += dd[i];
   53   1          return (uint8_t)(sum & 0xFF);
   54   1      }
-C51 COMPILER V9.59.0.0   MODEBUSRTU                                                        12/05/2025 19:14:57 PAGE 2   
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/26/2026 15:50:15 PAGE 2   
 
   55          // 校验计算函数（取低8位）7-1
   56          uint8_t calc_checksum(const uint8_t *dd, int len) {
@@ -106,16 +106,16 @@ line level    source
   94   1          
   95   1          uint8_t func = 0x03;                  // 功能码：读保持寄存器
   96   1          // 温度和湿度：转为整数后发送（×10保留一位小数）
-  97   1          uint16_t temp_send = (uint16_t)(sensor.Temperature * 10);
-  98   1          uint16_t humi_send = (uint16_t)(sensor.Humidity * 10);
+  97   1          uint16_t temp_send = sensor.Temperature;
+  98   1          uint16_t humi_send = sensor.Humidity;
   99   1        
  100   1          // 写入地址和功能码
  101   1          ModBusSendBuf[i++] = address;
  102   1          ModBusSendBuf[i++] = func;
  103   1      
  104   1          // 数据字节数：每项2字节，共7项（eCO2、eCH2O、TVOC、PM2.5、PM10、温度、湿度）
- 105   1          ModBusSendBuf[i++] = 14;
- 106   1      
+ 105   1          ModBusSendBuf[i++] = 15;
+ 106   1          ModBusSendBuf[i++] = 0x04; // 型号
  107   1          // ==== 依次写入各项传感器数据 ====
  108   1      //    for(i=3;i<=16;i++)ModBusSendBuf[i]=sensorRawData[i-3];
  109   1          ModBusSendBuf[i++] = (uint8_t)(sensor.eCO2 >> 8);
@@ -126,7 +126,7 @@ line level    source
  114   1      
  115   1          ModBusSendBuf[i++] = (uint8_t)(sensor.TVOC >> 8);
  116   1          ModBusSendBuf[i++] = (uint8_t)(sensor.TVOC & 0xFF);
-C51 COMPILER V9.59.0.0   MODEBUSRTU                                                        12/05/2025 19:14:57 PAGE 3   
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/26/2026 15:50:15 PAGE 3   
 
  117   1      
  118   1          ModBusSendBuf[i++] = (uint8_t)(sensor.PM2_5 >> 8);
@@ -190,7 +190,7 @@ line level    source
  176   1        uint16_t receive_data = (uint16_t)((ModbusReceiveBuf[4] << 8) | ModbusReceiveBuf[5]);
  177   1        Reg[Reg_address] = receive_data;
  178   1      }
-C51 COMPILER V9.59.0.0   MODEBUSRTU                                                        12/05/2025 19:14:57 PAGE 4   
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/26/2026 15:50:15 PAGE 4   
 
  179          
  180          
@@ -254,7 +254,7 @@ line level    source
  238          unsigned int parse_sensor_frame() {
  239   1      // 温度部分
  240   1          uint8_t temp_high = sensorRawData[12];
-C51 COMPILER V9.59.0.0   MODEBUSRTU                                                        12/05/2025 19:14:57 PAGE 5   
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/26/2026 15:50:15 PAGE 5   
 
  241   1          uint8_t temp_low  = sensorRawData[13];
  242   1        uint8_t checksum = calc_checksum(sensorRawData, sizeof(sensorRawData));
@@ -286,9 +286,9 @@ line level    source
  268   2              temp_high &= 0x7F;
  269   2              temp = -((float)temp_high + (temp_low / 10.0f));
  270   2          }
- 271   1          sensor.Temperature = temp;
+ 271   1          sensor.Temperature = temp*10;
  272   1          // 湿度部分
- 273   1          sensor.Humidity = sensorRawData[14] + (sensorRawData[15] / 10.0f);
+ 273   1          sensor.Humidity = (sensorRawData[14] + (sensorRawData[15] / 10.0f)) * 10;
  274   1          pRxPacket=0;
  275   1          return sensor.Humidity;
  276   1      }
@@ -318,7 +318,7 @@ line level    source
  300   2        case 0x03:
  301   2          if (ModbusReceiveBuf[2] != 0x99)
  302   2          {
-C51 COMPILER V9.59.0.0   MODEBUSRTU                                                        12/05/2025 19:14:57 PAGE 6   
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/26/2026 15:50:15 PAGE 6   
 
  303   3            ModBus_Send();
  304   3          }
@@ -382,7 +382,7 @@ line level    source
  362   2              
  363   2          }
  364   1          if(TI)
-C51 COMPILER V9.59.0.0   MODEBUSRTU                                                        12/05/2025 19:14:57 PAGE 7   
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/26/2026 15:50:15 PAGE 7   
 
  365   1          {
  366   2              TI = 0;
@@ -392,7 +392,7 @@ line level    source
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   1775    ----
+   CODE SIZE        =   1792    ----
    CONSTANT SIZE    =   ----    ----
    XDATA SIZE       =     99      35
    PDATA SIZE       =   ----    ----
