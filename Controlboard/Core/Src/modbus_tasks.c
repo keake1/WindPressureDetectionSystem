@@ -158,19 +158,20 @@ void TaskModbusReceive(void *arg)
                  * 新版传感器：
                  *   [addr][03][数据字节数(含型号)][型号][数据...][CRC]
                  *
-                 * 旧版 CO：
-                 *   [addr][03][02][CO_H][CO_L][CRC]
+                 * 旧版 CO2：
+                 *   [addr][03][02][CO2_H][CO2_L][CRC]
                  *
                  * 旧版 7 合 1：
                  *   [addr][03][14][7 组数据][CRC]
                  *
                  * 两种旧版传感器都不携带型号。数据区分别固定为 2 和
-                 * 14 字节；当前带型号的 CO/7 合 1 数据区分别为 3 和
+                 * 14 字节；当前带型号的 CO2/7 合 1 数据区分别为 3 和
                  * 15 字节，因此可无歧义区分。
                  */
                 if (byte_count == 2U)
                 {
-                    model      = SENSOR_MODEL_CO;
+                    /* 旧版无型号两字节响应按 CO2 处理。 */
+                    model      = SENSOR_MODEL_CO2;
                     data_start = 3U;
                     data_bytes = 2U;
                 }
