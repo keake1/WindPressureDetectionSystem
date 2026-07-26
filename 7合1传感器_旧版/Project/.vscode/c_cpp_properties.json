@@ -1,0 +1,38 @@
+{
+    "configurations": [
+        {
+            "name": "Project",
+            "includePath": [
+                "c:\\Users\\27414\\Desktop\\学习资料\\大二\\co项目\\7合1传感器\\User",
+                "c:\\Users\\27414\\Desktop\\学习资料\\大二\\co项目\\7合1传感器\\App",
+                "c:\\Users\\27414\\Desktop\\学习资料\\大二\\co项目\\7合1传感器\\Doc"
+            ],
+            "defines": [
+                "__C51__",
+                "__VSCODE_C51__",
+                "reentrant=",
+                "compact=",
+                "small=",
+                "large=",
+                "data=",
+                "idata=",
+                "pdata=",
+                "bdata=",
+                "xdata=",
+                "code=",
+                "bit=char",
+                "sbit=char",
+                "sfr=char",
+                "sfr16=int",
+                "sfr32=int",
+                "interrupt=",
+                "using=",
+                "_at_=",
+                "_priority_=",
+                "_task_="
+            ],
+            "intelliSenseMode": "${default}"
+        }
+    ],
+    "version": 4
+}

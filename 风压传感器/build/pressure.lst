@@ -1,0 +1,417 @@
+                                      1 ;--------------------------------------------------------
+                                      2 ; File Created by SDCC : free open source ISO C Compiler
+                                      3 ; Version 4.6.0 #16555 (Linux)
+                                      4 ;--------------------------------------------------------
+                                      5 	.module pressure
+                                      6 	
+                                      7 	.optsdcc -mmcs51 --model-small
+                                      8 ;--------------------------------------------------------
+                                      9 ; Public variables in this module
+                                     10 ;--------------------------------------------------------
+                                     11 	.globl _Uart1_Send
+                                     12 	.globl _Uart2_ReadByte
+                                     13 	.globl _Uart1_ReadByte
+                                     14 	.globl _Crc16_Append
+                                     15 	.globl _Crc16_Check
+                                     16 	.globl _Pressure_OnByte
+                                     17 	.globl _Pressure_Init
+                                     18 	.globl _Pressure_GetValue
+                                     19 	.globl _Pressure_ProcessRx
+                                     20 	.globl _Pressure_ProcessControllerRx
+                                     21 	.globl _Pressure_PollBlocking
+                                     22 ;--------------------------------------------------------
+                                     23 ; special function registers
+                                     24 ;--------------------------------------------------------
+                                     25 	.area RSEG    (ABS,DATA)
+      000000                         26 	.org 0x0000
+                                     27 ;--------------------------------------------------------
+                                     28 ; special function bits
+                                     29 ;--------------------------------------------------------
+                                     30 	.area RSEG    (ABS,DATA)
+      000000                         31 	.org 0x0000
+                                     32 ;--------------------------------------------------------
+                                     33 ; overlayable register banks
+                                     34 ;--------------------------------------------------------
+                                     35 	.area REG_BANK_0	(REL,OVR,DATA)
+      000000                         36 	.ds 8
+                                     37 ;--------------------------------------------------------
+                                     38 ; internal ram data
+                                     39 ;--------------------------------------------------------
+                                     40 	.area DSEG    (DATA)
+      000000                         41 _g_pressure:
+      000000                         42 	.ds 2
+      000002                         43 _g_frame_pos:
+      000002                         44 	.ds 1
+      000003                         45 _g_pressure_hi:
+      000003                         46 	.ds 1
+      000004                         47 _g_pressure_lo:
+      000004                         48 	.ds 1
+      000005                         49 _Pressure_ProcessRx_b_10000_37:
+      000005                         50 	.ds 1
+      000006                         51 _Pressure_ProcessControllerRx_b_10000_40:
+      000006                         52 	.ds 1
+      000007                         53 _Pressure_PollBlocking_req_10000_43:
+      000007                         54 	.ds 8
+      00000F                         55 _Pressure_PollBlocking_resp_10000_43:
+      00000F                         56 	.ds 7
+      000016                         57 _Pressure_PollBlocking_b_10000_43:
+      000016                         58 	.ds 1
+                                     59 ;--------------------------------------------------------
+                                     60 ; overlayable items in internal ram
+                                     61 ;--------------------------------------------------------
+                                     62 	.area	OSEG    (OVR,DATA)
+                                     63 ;--------------------------------------------------------
+                                     64 ; indirectly addressable internal ram data
+                                     65 ;--------------------------------------------------------
+                                     66 	.area ISEG    (DATA)
+                                     67 ;--------------------------------------------------------
+                                     68 ; absolute internal ram data
+                                     69 ;--------------------------------------------------------
+                                     70 	.area IABS    (ABS,DATA)
+                                     71 	.area IABS    (ABS,DATA)
+                                     72 ;--------------------------------------------------------
+                                     73 ; bit data
+                                     74 ;--------------------------------------------------------
+                                     75 	.area BSEG    (BIT)
+                                     76 ;--------------------------------------------------------
+                                     77 ; paged external ram data
+                                     78 ;--------------------------------------------------------
+                                     79 	.area PSEG    (PAG,XDATA)
+                                     80 ;--------------------------------------------------------
+                                     81 ; uninitialized external ram data
+                                     82 ;--------------------------------------------------------
+                                     83 	.area XSEG    (XDATA)
+                                     84 ;--------------------------------------------------------
+                                     85 ; absolute external ram data
+                                     86 ;--------------------------------------------------------
+                                     87 	.area XABS    (ABS,XDATA)
+                                     88 ;--------------------------------------------------------
+                                     89 ; initialized external ram data
+                                     90 ;--------------------------------------------------------
+                                     91 	.area XISEG   (XDATA)
+                                     92 	.area HOME    (CODE)
+                                     93 	.area GSINIT0 (CODE)
+                                     94 	.area GSINIT1 (CODE)
+                                     95 	.area GSINIT2 (CODE)
+                                     96 	.area GSINIT3 (CODE)
+                                     97 	.area GSINIT4 (CODE)
+                                     98 	.area GSINIT5 (CODE)
+                                     99 	.area GSINIT  (CODE)
+                                    100 	.area GSFINAL (CODE)
+                                    101 	.area CSEG    (CODE)
+                                    102 ;--------------------------------------------------------
+                                    103 ; global & static initialisations
+                                    104 ;--------------------------------------------------------
+                                    105 	.area HOME    (CODE)
+                                    106 	.area GSINIT  (CODE)
+                                    107 	.area GSFINAL (CODE)
+                                    108 	.area GSINIT  (CODE)
+                                    109 ;--------------------------------------------------------
+                                    110 ; Home
+                                    111 ;--------------------------------------------------------
+                                    112 	.area HOME    (CODE)
+                                    113 	.area HOME    (CODE)
+                                    114 ;--------------------------------------------------------
+                                    115 ; code
+                                    116 ;--------------------------------------------------------
+                                    117 	.area CSEG    (CODE)
+                                    118 ;------------------------------------------------------------
+                                    119 ;Allocation info for local variables in function 'Pressure_OnByte'
+                                    120 ;------------------------------------------------------------
+                                    121 ;b             Allocated to registers r7 
+                                    122 ;pressure      Allocated to registers r6 r7 
+                                    123 ;------------------------------------------------------------
+                                    124 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:12: void Pressure_OnByte(uint8_t b)
+                                    125 ;	-----------------------------------------
+                                    126 ;	 function Pressure_OnByte
+                                    127 ;	-----------------------------------------
+      000000                        128 _Pressure_OnByte:
+                           000007   129 	ar7 = 0x07
+                           000006   130 	ar6 = 0x06
+                           000005   131 	ar5 = 0x05
+                           000004   132 	ar4 = 0x04
+                           000003   133 	ar3 = 0x03
+                           000002   134 	ar2 = 0x02
+                           000001   135 	ar1 = 0x01
+                           000000   136 	ar0 = 0x00
+      000000 AF 82            [24]  137 	mov	r7, dpl
+                                    138 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:14: if (b == 0xFEU) {
+      000002 BF FE 04         [24]  139 	cjne	r7,#0xfe,00102$
+                                    140 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:15: g_frame_pos = 1U;
+      000005 75*02 01         [24]  141 	mov	_g_frame_pos,#0x01
+                                    142 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:16: return;
+      000008 22               [24]  143 	ret
+      000009                        144 00102$:
+                                    145 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:19: switch (g_frame_pos) {
+      000009 E5*02            [12]  146 	mov	a,_g_frame_pos
+      00000B 24 FB            [12]  147 	add	a,#0xff - 0x04
+      00000D 40 2D            [24]  148 	jc	00108$
+                                    149 ;	free result
+      00000F E5*02            [12]  150 	mov	a,_g_frame_pos
+      000011 75 F0 03         [24]  151 	mov	b,#0x03
+      000014 A4               [48]  152 	mul	ab
+      000015 90r00r19         [24]  153 	mov	dptr,#00148$
+      000018 73               [24]  154 	jmp	@a+dptr
+      000019                        155 00148$:
+      000019 02r00r61         [24]  156 	ljmp	00114$
+      00001C 02r00r28         [24]  157 	ljmp	00104$
+      00001F 02r00r2E         [24]  158 	ljmp	00105$
+      000022 02r00r34         [24]  159 	ljmp	00106$
+      000025 02r00r38         [24]  160 	ljmp	00107$
+                                    161 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:23: case 1:
+      000028                        162 00104$:
+                                    163 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:24: g_pressure_hi = b;
+      000028 8F*03            [24]  164 	mov	_g_pressure_hi,r7
+                                    165 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:25: g_frame_pos = 2U;
+      00002A 75*02 02         [24]  166 	mov	_g_frame_pos,#0x02
+                                    167 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:26: break;
+                                    168 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:28: case 2:
+      00002D 22               [24]  169 	ret
+      00002E                        170 00105$:
+                                    171 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:29: g_pressure_lo = b;
+      00002E 8F*04            [24]  172 	mov	_g_pressure_lo,r7
+                                    173 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:30: g_frame_pos = 3U;
+      000030 75*02 03         [24]  174 	mov	_g_frame_pos,#0x03
+                                    175 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:31: break;
+                                    176 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:33: case 3:
+      000033 22               [24]  177 	ret
+      000034                        178 00106$:
+                                    179 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:34: g_frame_pos = 4U;
+      000034 75*02 04         [24]  180 	mov	_g_frame_pos,#0x04
+                                    181 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:35: break;
+                                    182 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:37: case 4:
+      000037 22               [24]  183 	ret
+      000038                        184 00107$:
+                                    185 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:38: g_frame_pos = 5U;
+      000038 75*02 05         [24]  186 	mov	_g_frame_pos,#0x05
+                                    187 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:39: break;
+                                    188 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:41: default:
+      00003B 22               [24]  189 	ret
+      00003C                        190 00108$:
+                                    191 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:42: if (b == 0xDCU) {
+      00003C BF DC 1F         [24]  192 	cjne	r7,#0xdc,00112$
+                                    193 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:43: uint16_t pressure = ((uint16_t)g_pressure_hi << 8) | g_pressure_lo;
+      00003F AF*03            [24]  194 	mov	r7,_g_pressure_hi
+      000041 7E 00            [12]  195 	mov	r6,#0x00
+      000043 AC*04            [24]  196 	mov	r4,_g_pressure_lo
+      000045 7D 00            [12]  197 	mov	r5,#0x00
+      000047 EC               [12]  198 	mov	a,r4
+      000048 42 06            [12]  199 	orl	ar6,a
+      00004A ED               [12]  200 	mov	a,r5
+      00004B 42 07            [12]  201 	orl	ar7,a
+                                    202 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:44: if (pressure <= 999U) {
+      00004D 8E 04            [24]  203 	mov	ar4,r6
+      00004F 8F 05            [24]  204 	mov	ar5,r7
+      000051 C3               [12]  205 	clr	c
+      000052 74 E7            [12]  206 	mov	a,#0xe7
+      000054 9C               [12]  207 	subb	a,r4
+      000055 74 03            [12]  208 	mov	a,#0x03
+      000057 9D               [12]  209 	subb	a,r5
+      000058 40 04            [24]  210 	jc	00112$
+                                    211 ;	free result
+                                    212 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:45: g_pressure = pressure;
+      00005A 8E*00            [24]  213 	mov	_g_pressure,r6
+      00005C 8F*01            [24]  214 	mov	(_g_pressure + 1),r7
+      00005E                        215 00112$:
+                                    216 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:48: g_frame_pos = 0U;
+      00005E 75*02 00         [24]  217 	mov	_g_frame_pos,#0x00
+                                    218 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:50: }
+      000061                        219 00114$:
+                                    220 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:51: }
+      000061 22               [24]  221 	ret
+                                    222 ;------------------------------------------------------------
+                                    223 ;Allocation info for local variables in function 'Pressure_Init'
+                                    224 ;------------------------------------------------------------
+                                    225 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:53: void Pressure_Init(void)
+                                    226 ;	-----------------------------------------
+                                    227 ;	 function Pressure_Init
+                                    228 ;	-----------------------------------------
+      000062                        229 _Pressure_Init:
+                                    230 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:55: g_pressure = 0U;
+      000062 E4               [12]  231 	clr	a
+      000063 F5*00            [12]  232 	mov	_g_pressure,a
+      000065 F5*01            [12]  233 	mov	(_g_pressure + 1),a
+                                    234 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:56: g_frame_pos = 0U;
+      000067 F5*02            [12]  235 	mov	_g_frame_pos,a
+                                    236 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:57: g_pressure_hi = 0U;
+      000069 F5*03            [12]  237 	mov	_g_pressure_hi,a
+                                    238 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:58: g_pressure_lo = 0U;
+      00006B F5*04            [12]  239 	mov	_g_pressure_lo,a
+                                    240 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:59: }
+      00006D 22               [24]  241 	ret
+                                    242 ;------------------------------------------------------------
+                                    243 ;Allocation info for local variables in function 'Pressure_GetValue'
+                                    244 ;------------------------------------------------------------
+                                    245 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:61: uint16_t Pressure_GetValue(void)
+                                    246 ;	-----------------------------------------
+                                    247 ;	 function Pressure_GetValue
+                                    248 ;	-----------------------------------------
+      00006E                        249 _Pressure_GetValue:
+                                    250 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:63: return g_pressure;
+      00006E 85*00 82         [24]  251 	mov	dpl, _g_pressure
+      000071 85*01 83         [24]  252 	mov	dph, (_g_pressure + 1)
+                                    253 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:64: }
+      000074 22               [24]  254 	ret
+                                    255 ;------------------------------------------------------------
+                                    256 ;Allocation info for local variables in function 'Pressure_ProcessRx'
+                                    257 ;------------------------------------------------------------
+                                    258 ;b             Allocated with name '_Pressure_ProcessRx_b_10000_37'
+                                    259 ;------------------------------------------------------------
+                                    260 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:66: void Pressure_ProcessRx(void)
+                                    261 ;	-----------------------------------------
+                                    262 ;	 function Pressure_ProcessRx
+                                    263 ;	-----------------------------------------
+      000075                        264 _Pressure_ProcessRx:
+                                    265 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:70: while (Uart1_ReadByte(&b) != 0U) {
+      000075                        266 00101$:
+      000075 90r00r05         [24]  267 	mov	dptr,#_Pressure_ProcessRx_b_10000_37
+      000078 75 F0 40         [24]  268 	mov	b, #0x40
+      00007B 12r00r00         [24]  269 	lcall	_Uart1_ReadByte
+      00007E E5 82            [12]  270 	mov	a, dpl
+      000080 60 08            [24]  271 	jz	00104$
+                                    272 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:71: Pressure_OnByte(b);
+      000082 85*05 82         [24]  273 	mov	dpl, _Pressure_ProcessRx_b_10000_37
+      000085 12r00r00         [24]  274 	lcall	_Pressure_OnByte
+      000088 80 EB            [24]  275 	sjmp	00101$
+      00008A                        276 00104$:
+                                    277 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:73: }
+      00008A 22               [24]  278 	ret
+                                    279 ;------------------------------------------------------------
+                                    280 ;Allocation info for local variables in function 'Pressure_ProcessControllerRx'
+                                    281 ;------------------------------------------------------------
+                                    282 ;b             Allocated with name '_Pressure_ProcessControllerRx_b_10000_40'
+                                    283 ;------------------------------------------------------------
+                                    284 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:75: void Pressure_ProcessControllerRx(void)
+                                    285 ;	-----------------------------------------
+                                    286 ;	 function Pressure_ProcessControllerRx
+                                    287 ;	-----------------------------------------
+      00008B                        288 _Pressure_ProcessControllerRx:
+                                    289 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:79: while (Uart2_ReadByte(&b) != 0U) {
+      00008B                        290 00101$:
+      00008B 90r00r06         [24]  291 	mov	dptr,#_Pressure_ProcessControllerRx_b_10000_40
+      00008E 75 F0 40         [24]  292 	mov	b, #0x40
+      000091 12r00r00         [24]  293 	lcall	_Uart2_ReadByte
+      000094 E5 82            [12]  294 	mov	a, dpl
+      000096 60 08            [24]  295 	jz	00104$
+                                    296 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:80: Pressure_OnByte(b);
+      000098 85*06 82         [24]  297 	mov	dpl, _Pressure_ProcessControllerRx_b_10000_40
+      00009B 12r00r00         [24]  298 	lcall	_Pressure_OnByte
+      00009E 80 EB            [24]  299 	sjmp	00101$
+      0000A0                        300 00104$:
+                                    301 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:82: }
+      0000A0 22               [24]  302 	ret
+                                    303 ;------------------------------------------------------------
+                                    304 ;Allocation info for local variables in function 'Pressure_PollBlocking'
+                                    305 ;------------------------------------------------------------
+                                    306 ;req           Allocated with name '_Pressure_PollBlocking_req_10000_43'
+                                    307 ;resp          Allocated with name '_Pressure_PollBlocking_resp_10000_43'
+                                    308 ;i             Allocated to registers r7 
+                                    309 ;wait          Allocated to registers r5 r6 
+                                    310 ;b             Allocated with name '_Pressure_PollBlocking_b_10000_43'
+                                    311 ;------------------------------------------------------------
+                                    312 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:84: void Pressure_PollBlocking(void)
+                                    313 ;	-----------------------------------------
+                                    314 ;	 function Pressure_PollBlocking
+                                    315 ;	-----------------------------------------
+      0000A1                        316 _Pressure_PollBlocking:
+                                    317 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:92: req[0] = PRESSURE_MODULE_ADDR;
+      0000A1 75*07 01         [24]  318 	mov	_Pressure_PollBlocking_req_10000_43,#0x01
+                                    319 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:93: req[1] = 0x03U;
+      0000A4 75*08 03         [24]  320 	mov	(_Pressure_PollBlocking_req_10000_43 + 0x0001),#0x03
+                                    321 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:94: req[2] = 0x00U;
+      0000A7 75*09 00         [24]  322 	mov	(_Pressure_PollBlocking_req_10000_43 + 0x0002),#0x00
+                                    323 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:95: req[3] = 0x00U;
+      0000AA 75*0A 00         [24]  324 	mov	(_Pressure_PollBlocking_req_10000_43 + 0x0003),#0x00
+                                    325 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:96: req[4] = 0x00U;
+      0000AD 75*0B 00         [24]  326 	mov	(_Pressure_PollBlocking_req_10000_43 + 0x0004),#0x00
+                                    327 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:97: req[5] = 0x01U;
+      0000B0 75*0C 01         [24]  328 	mov	(_Pressure_PollBlocking_req_10000_43 + 0x0005),#0x01
+                                    329 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:98: Crc16_Append(req, 6U);
+      0000B3 75*00 06         [24]  330 	mov	_Crc16_Append_PARM_2,#0x06
+      0000B6 90r00r07         [24]  331 	mov	dptr,#_Pressure_PollBlocking_req_10000_43
+      0000B9 75 F0 40         [24]  332 	mov	b, #0x40
+      0000BC 12r00r00         [24]  333 	lcall	_Crc16_Append
+                                    334 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:100: Uart1_Send(req, sizeof(req));
+      0000BF 75*00 08         [24]  335 	mov	_Uart1_Send_PARM_2,#0x08
+      0000C2 90r00r07         [24]  336 	mov	dptr,#_Pressure_PollBlocking_req_10000_43
+      0000C5 75 F0 40         [24]  337 	mov	b, #0x40
+      0000C8 12r00r00         [24]  338 	lcall	_Uart1_Send
+                                    339 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:102: for (wait = 0U; wait < 30000U; ++wait) {
+      0000CB 7F 00            [12]  340 	mov	r7,#0x00
+      0000CD 7D 00            [12]  341 	mov	r5,#0x00
+      0000CF 7E 00            [12]  342 	mov	r6,#0x00
+      0000D1                        343 00114$:
+                                    344 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:103: if (Uart1_ReadByte(&b) != 0U) {
+      0000D1 90r00r16         [24]  345 	mov	dptr,#_Pressure_PollBlocking_b_10000_43
+      0000D4 75 F0 40         [24]  346 	mov	b, #0x40
+      0000D7 C0 07            [24]  347 	push	ar7
+      0000D9 C0 06            [24]  348 	push	ar6
+      0000DB C0 05            [24]  349 	push	ar5
+      0000DD 12r00r00         [24]  350 	lcall	_Uart1_ReadByte
+      0000E0 E5 82            [12]  351 	mov	a, dpl
+      0000E2 D0 05            [24]  352 	pop	ar5
+      0000E4 D0 06            [24]  353 	pop	ar6
+      0000E6 D0 07            [24]  354 	pop	ar7
+      0000E8 60 0C            [24]  355 	jz	00115$
+                                    356 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:105: resp[i++] = b;
+      0000EA EF               [12]  357 	mov	a,r7
+      0000EB 24r0F            [12]  358 	add	a, #_Pressure_PollBlocking_resp_10000_43
+      0000ED F9               [12]  359 	mov	r1,a
+      0000EE 0F               [12]  360 	inc	r7
+      0000EF A7*16            [24]  361 	mov	@r1,_Pressure_PollBlocking_b_10000_43
+                                    362 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:107: if (i >= sizeof(resp)) {
+      0000F1 BF 07 00         [24]  363 	cjne	r7,#0x07,00172$
+      0000F4                        364 00172$:
+      0000F4 50 12            [24]  365 	jnc	00107$
+                                    366 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:108: break;
+      0000F6                        367 00115$:
+                                    368 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:102: for (wait = 0U; wait < 30000U; ++wait) {
+      0000F6 0D               [12]  369 	inc	r5
+      0000F7 BD 00 01         [24]  370 	cjne	r5,#0x00,00174$
+      0000FA 0E               [12]  371 	inc	r6
+      0000FB                        372 00174$:
+      0000FB 8D 03            [24]  373 	mov	ar3,r5
+      0000FD 8E 04            [24]  374 	mov	ar4,r6
+      0000FF C3               [12]  375 	clr	c
+      000100 EB               [12]  376 	mov	a,r3
+      000101 94 30            [12]  377 	subb	a,#0x30
+      000103 EC               [12]  378 	mov	a,r4
+      000104 94 75            [12]  379 	subb	a,#0x75
+      000106 40 C9            [24]  380 	jc	00114$
+      000108                        381 00107$:
+                                    382 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:113: if ((i == sizeof(resp)) &&
+      000108 BF 07 2F         [24]  383 	cjne	r7,#0x07,00116$
+                                    384 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:114: (resp[0] == PRESSURE_MODULE_ADDR) &&
+      00010B 74 01            [12]  385 	mov	a,#0x01
+      00010D B5*0F 2A         [24]  386 	cjne	a,_Pressure_PollBlocking_resp_10000_43,00116$
+                                    387 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:115: (resp[1] == 0x03U) &&
+      000110 74 03            [12]  388 	mov	a,#0x03
+      000112 B5*10 25         [24]  389 	cjne	a,(_Pressure_PollBlocking_resp_10000_43 + 0x0001),00116$
+                                    390 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:116: (resp[2] == 0x02U) &&
+      000115 74 02            [12]  391 	mov	a,#0x02
+      000117 B5*11 20         [24]  392 	cjne	a,(_Pressure_PollBlocking_resp_10000_43 + 0x0002),00116$
+                                    393 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:117: (Crc16_Check(resp, sizeof(resp)) != 0U)) {
+      00011A 75*00 07         [24]  394 	mov	_Crc16_Check_PARM_2,#0x07
+      00011D 90r00r0F         [24]  395 	mov	dptr,#_Pressure_PollBlocking_resp_10000_43
+      000120 75 F0 40         [24]  396 	mov	b, #0x40
+      000123 12r00r00         [24]  397 	lcall	_Crc16_Check
+      000126 E5 82            [12]  398 	mov	a, dpl
+      000128 60 10            [24]  399 	jz	00116$
+                                    400 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:118: g_pressure = ((uint16_t)resp[3] << 8) | resp[4];
+      00012A AF*12            [24]  401 	mov	r7,(_Pressure_PollBlocking_resp_10000_43 + 0x0003)
+      00012C 7E 00            [12]  402 	mov	r6,#0x00
+      00012E AC*13            [24]  403 	mov	r4,(_Pressure_PollBlocking_resp_10000_43 + 0x0004)
+      000130 7D 00            [12]  404 	mov	r5,#0x00
+      000132 EC               [12]  405 	mov	a,r4
+      000133 4E               [12]  406 	orl	a,r6
+      000134 F5*00            [12]  407 	mov	_g_pressure,a
+      000136 ED               [12]  408 	mov	a,r5
+      000137 4F               [12]  409 	orl	a,r7
+      000138 F5*01            [12]  410 	mov	(_g_pressure + 1),a
+      00013A                        411 00116$:
+                                    412 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/pressure.c:120: }
+      00013A 22               [24]  413 	ret
+                                    414 	.area CSEG    (CODE)
+                                    415 	.area CONST   (CODE)
+                                    416 	.area XINIT   (CODE)
+                                    417 	.area CABS    (ABS,CODE)

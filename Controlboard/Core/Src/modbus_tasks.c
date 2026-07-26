@@ -144,25 +144,70 @@ void TaskModbusReceive(void *arg)
             }
 
             /* ---- 6. 有效传感器地址 (1-63) — 存类型、数据和报警判定 ---- */
-            if (slave >= 1 && slave <= MODBUS_MAX_SLAVES)
+            if (slave >= 1 && slave <= MODBUS_MAX_SLAVES &&
+                raw.frame[1] == MODBUS_FUNC_READ_HOLDING_REGISTERS)
             {
-                uint8_t  byte_count = raw.frame[2];   /* 含型号字节 */
-                uint8_t  model      = raw.frame[3];
+                uint8_t  byte_count = raw.frame[2];
+                uint8_t  model;
+                uint8_t  data_start;
+                uint16_t data_bytes;
+
+                /*
+                 * 响应协议兼容：
+                 *
+                 * 新版传感器：
+                 *   [addr][03][数据字节数(含型号)][型号][数据...][CRC]
+                 *
+                 * 旧版 CO：
+                 *   [addr][03][02][CO_H][CO_L][CRC]
+                 *
+                 * 旧版 7 合 1：
+                 *   [addr][03][14][7 组数据][CRC]
+                 *
+                 * 两种旧版传感器都不携带型号。数据区分别固定为 2 和
+                 * 14 字节；当前带型号的 CO/7 合 1 数据区分别为 3 和
+                 * 15 字节，因此可无歧义区分。
+                 */
+                if (byte_count == 2U)
+                {
+                    model      = SENSOR_MODEL_CO;
+                    data_start = 3U;
+                    data_bytes = 2U;
+                }
+                else if (byte_count == 14U)
+                {
+                    model      = SENSOR_MODEL_7IN1;
+                    data_start = 3U;
+                    data_bytes = 14U;
+                }
+                else if (byte_count >= 3U)
+                {
+                    model      = raw.frame[3];
+                    data_start = 4U;
+                    data_bytes = (uint16_t)(byte_count - 1U);
+                }
+                else
+                {
+                    /* 空数据响应不是本系统支持的传感器帧。 */
+                    continue;
+                }
+
+                /* 响应长度必须与字节数匹配，避免将异常帧写入寄存器表。 */
+                if (raw.length != (uint16_t)(byte_count + 5U))
+                    continue;
 
                 /* 记录传感器类型 */
                 ModbusReg_SetType(slave, model);
 
-                /* 解析数据：frame[4] 起为数据，共 (byte_count - 1) 字节
-                 * 简单传感器：2 字节 → 1 个寄存器值
-                 * 7 合 1：   14 字节 → 7 个寄存器值 */
-                uint16_t data_bytes = (byte_count >= 1) ? (byte_count - 1) : 0;
+                /* 解析数据：每 2 字节一个 uint16。
+                 * 带型号帧从 frame[4] 开始；旧版 CO 从 frame[3] 开始。 */
                 for (uint8_t i = 0; i < MODBUS_DATA_REGS_PER_SENSOR; i++)
                 {
                     /* 每 2 字节一个 uint16，不足则跳出 */
                     if ((i * 2 + 1) >= data_bytes) break;
 
-                    uint16_t val = ((uint16_t)raw.frame[4 + i * 2] << 8) |
-                                    raw.frame[5 + i * 2];
+                    uint16_t val = ((uint16_t)raw.frame[data_start + i * 2] << 8) |
+                                    raw.frame[data_start + i * 2 + 1];
                     ModbusReg_SetData(slave, i, val);
                 }
 

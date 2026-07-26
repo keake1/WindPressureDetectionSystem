@@ -15,7 +15,7 @@
  *   只有按空闲间隔定界才能保证不错位。
  *
  * 支持的指令（与 Controlboard modbus_tasks.c 对应）：
- *   读：  addr 03 00 00 00 01 CRC
+ *   读：  addr 03 00 00/00 01 00 01 CRC
  *         回复 addr 03 03 <型号 0x02> <压力高> <压力低> CRC
  *   报警：addr 06 00 04 00 <00/01> CRC → 控制红灯
  *         不回复——主站不等待写响应，且主站解析不区分功能码，
@@ -86,9 +86,16 @@ static void SensorModbus_HandleFrame(uint8_t my_addr, uint16_t pressure)
         return;
     }
 
-    /* 读保持寄存器：寄存器 0x0000，数量 0x0001 */
+    /*
+     * 读保持寄存器：数量固定为 0x0001。
+     *
+     * 控制器统一读取 0x0001，以兼容旧版 CO 传感器；保留对
+     * 0x0000 的支持，以兼容旧版控制器和既有调试工具。
+     * 风压数据本身不区分寄存器地址，两种请求均回复同一数值。
+     */
     if ((g_rx[1] == 0x03U) &&
-        (g_rx[2] == 0x00U) && (g_rx[3] == 0x00U) &&
+        (g_rx[2] == 0x00U) &&
+        ((g_rx[3] == 0x00U) || (g_rx[3] == 0x01U)) &&
         (g_rx[4] == 0x00U) && (g_rx[5] == 0x01U)) {
         SensorModbus_ReplyPressure(my_addr, pressure);
         return;

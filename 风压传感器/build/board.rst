@@ -1,0 +1,435 @@
+                                      1 ;--------------------------------------------------------
+                                      2 ; File Created by SDCC : free open source ISO C Compiler
+                                      3 ; Version 4.6.0 #16555 (Linux)
+                                      4 ;--------------------------------------------------------
+                                      5 	.module board
+                                      6 	
+                                      7 	.optsdcc -mmcs51 --model-small
+                                      8 ;--------------------------------------------------------
+                                      9 ; Public variables in this module
+                                     10 ;--------------------------------------------------------
+                                     11 	.globl _P37
+                                     12 	.globl _P36
+                                     13 	.globl _P35
+                                     14 	.globl _P34
+                                     15 	.globl _P33
+                                     16 	.globl _P32
+                                     17 	.globl _P31
+                                     18 	.globl _P30
+                                     19 	.globl _P27
+                                     20 	.globl _P26
+                                     21 	.globl _P25
+                                     22 	.globl _P24
+                                     23 	.globl _P23
+                                     24 	.globl _P22
+                                     25 	.globl _P21
+                                     26 	.globl _P20
+                                     27 	.globl _P17
+                                     28 	.globl _P16
+                                     29 	.globl _P15
+                                     30 	.globl _P14
+                                     31 	.globl _P13
+                                     32 	.globl _P12
+                                     33 	.globl _P11
+                                     34 	.globl _P10
+                                     35 	.globl _P07
+                                     36 	.globl _P06
+                                     37 	.globl _P05
+                                     38 	.globl _P04
+                                     39 	.globl _P03
+                                     40 	.globl _P02
+                                     41 	.globl _P01
+                                     42 	.globl _P00
+                                     43 	.globl _P4M0
+                                     44 	.globl _P4M1
+                                     45 	.globl _P3M0
+                                     46 	.globl _P3M1
+                                     47 	.globl _P2M0
+                                     48 	.globl _P2M1
+                                     49 	.globl _P0M0
+                                     50 	.globl _P0M1
+                                     51 	.globl _P1M0
+                                     52 	.globl _P1M1
+                                     53 	.globl _T2L
+                                     54 	.globl _T2H
+                                     55 	.globl _IP
+                                     56 	.globl _IE
+                                     57 	.globl _P_SW1
+                                     58 	.globl _S2BUF
+                                     59 	.globl _S2CON
+                                     60 	.globl _SBUF
+                                     61 	.globl _SCON
+                                     62 	.globl _AUXR
+                                     63 	.globl _TH1
+                                     64 	.globl _TH0
+                                     65 	.globl _TL1
+                                     66 	.globl _TL0
+                                     67 	.globl _TMOD
+                                     68 	.globl _TCON
+                                     69 	.globl _PCON
+                                     70 	.globl _DPH
+                                     71 	.globl _DPL
+                                     72 	.globl _SP
+                                     73 	.globl _P3
+                                     74 	.globl _P2
+                                     75 	.globl _P1
+                                     76 	.globl _P0
+                                     77 	.globl _Board_Init
+                                     78 	.globl _Board_ReadAddress
+                                     79 	.globl _Board_RedLedSet
+                                     80 	.globl _Board_GreenLedToggle
+                                     81 	.globl _Board_DelayMs
+                                     82 ;--------------------------------------------------------
+                                     83 ; special function registers
+                                     84 ;--------------------------------------------------------
+                                     85 	.area RSEG    (ABS,DATA)
+      000000                         86 	.org 0x0000
+                           000080    87 _P0	=	0x0080
+                           000090    88 _P1	=	0x0090
+                           0000A0    89 _P2	=	0x00a0
+                           0000B0    90 _P3	=	0x00b0
+                           000081    91 _SP	=	0x0081
+                           000082    92 _DPL	=	0x0082
+                           000083    93 _DPH	=	0x0083
+                           000087    94 _PCON	=	0x0087
+                           000088    95 _TCON	=	0x0088
+                           000089    96 _TMOD	=	0x0089
+                           00008A    97 _TL0	=	0x008a
+                           00008B    98 _TL1	=	0x008b
+                           00008C    99 _TH0	=	0x008c
+                           00008D   100 _TH1	=	0x008d
+                           00008E   101 _AUXR	=	0x008e
+                           000098   102 _SCON	=	0x0098
+                           000099   103 _SBUF	=	0x0099
+                           00009A   104 _S2CON	=	0x009a
+                           00009B   105 _S2BUF	=	0x009b
+                           0000A2   106 _P_SW1	=	0x00a2
+                           0000A8   107 _IE	=	0x00a8
+                           0000B8   108 _IP	=	0x00b8
+                           0000D6   109 _T2H	=	0x00d6
+                           0000D7   110 _T2L	=	0x00d7
+                           000091   111 _P1M1	=	0x0091
+                           000092   112 _P1M0	=	0x0092
+                           000093   113 _P0M1	=	0x0093
+                           000094   114 _P0M0	=	0x0094
+                           000095   115 _P2M1	=	0x0095
+                           000096   116 _P2M0	=	0x0096
+                           0000B1   117 _P3M1	=	0x00b1
+                           0000B2   118 _P3M0	=	0x00b2
+                           0000BA   119 _P4M1	=	0x00ba
+                           0000BB   120 _P4M0	=	0x00bb
+                                    121 ;--------------------------------------------------------
+                                    122 ; special function bits
+                                    123 ;--------------------------------------------------------
+                                    124 	.area RSEG    (ABS,DATA)
+      000000                        125 	.org 0x0000
+                           000080   126 _P00	=	0x0080
+                           000081   127 _P01	=	0x0081
+                           000082   128 _P02	=	0x0082
+                           000083   129 _P03	=	0x0083
+                           000084   130 _P04	=	0x0084
+                           000085   131 _P05	=	0x0085
+                           000086   132 _P06	=	0x0086
+                           000087   133 _P07	=	0x0087
+                           000090   134 _P10	=	0x0090
+                           000091   135 _P11	=	0x0091
+                           000092   136 _P12	=	0x0092
+                           000093   137 _P13	=	0x0093
+                           000094   138 _P14	=	0x0094
+                           000095   139 _P15	=	0x0095
+                           000096   140 _P16	=	0x0096
+                           000097   141 _P17	=	0x0097
+                           0000A0   142 _P20	=	0x00a0
+                           0000A1   143 _P21	=	0x00a1
+                           0000A2   144 _P22	=	0x00a2
+                           0000A3   145 _P23	=	0x00a3
+                           0000A4   146 _P24	=	0x00a4
+                           0000A5   147 _P25	=	0x00a5
+                           0000A6   148 _P26	=	0x00a6
+                           0000A7   149 _P27	=	0x00a7
+                           0000B0   150 _P30	=	0x00b0
+                           0000B1   151 _P31	=	0x00b1
+                           0000B2   152 _P32	=	0x00b2
+                           0000B3   153 _P33	=	0x00b3
+                           0000B4   154 _P34	=	0x00b4
+                           0000B5   155 _P35	=	0x00b5
+                           0000B6   156 _P36	=	0x00b6
+                           0000B7   157 _P37	=	0x00b7
+                                    158 ;--------------------------------------------------------
+                                    159 ; overlayable register banks
+                                    160 ;--------------------------------------------------------
+                                    161 	.area REG_BANK_0	(REL,OVR,DATA)
+      000000                        162 	.ds 8
+                                    163 ;--------------------------------------------------------
+                                    164 ; internal ram data
+                                    165 ;--------------------------------------------------------
+                                    166 	.area DSEG    (DATA)
+                                    167 ;--------------------------------------------------------
+                                    168 ; overlayable items in internal ram
+                                    169 ;--------------------------------------------------------
+                                    170 	.area	OSEG    (OVR,DATA)
+                                    171 	.area	OSEG    (OVR,DATA)
+                                    172 	.area	OSEG    (OVR,DATA)
+                                    173 ;--------------------------------------------------------
+                                    174 ; indirectly addressable internal ram data
+                                    175 ;--------------------------------------------------------
+                                    176 	.area ISEG    (DATA)
+                                    177 ;--------------------------------------------------------
+                                    178 ; absolute internal ram data
+                                    179 ;--------------------------------------------------------
+                                    180 	.area IABS    (ABS,DATA)
+                                    181 	.area IABS    (ABS,DATA)
+                                    182 ;--------------------------------------------------------
+                                    183 ; bit data
+                                    184 ;--------------------------------------------------------
+                                    185 	.area BSEG    (BIT)
+      000000                        186 _Board_RedLedSet_sloc0_1_0:
+      000000                        187 	.ds 1
+                                    188 ;--------------------------------------------------------
+                                    189 ; paged external ram data
+                                    190 ;--------------------------------------------------------
+                                    191 	.area PSEG    (PAG,XDATA)
+                                    192 ;--------------------------------------------------------
+                                    193 ; uninitialized external ram data
+                                    194 ;--------------------------------------------------------
+                                    195 	.area XSEG    (XDATA)
+                                    196 ;--------------------------------------------------------
+                                    197 ; absolute external ram data
+                                    198 ;--------------------------------------------------------
+                                    199 	.area XABS    (ABS,XDATA)
+                                    200 ;--------------------------------------------------------
+                                    201 ; initialized external ram data
+                                    202 ;--------------------------------------------------------
+                                    203 	.area XISEG   (XDATA)
+                                    204 	.area HOME    (CODE)
+                                    205 	.area GSINIT0 (CODE)
+                                    206 	.area GSINIT1 (CODE)
+                                    207 	.area GSINIT2 (CODE)
+                                    208 	.area GSINIT3 (CODE)
+                                    209 	.area GSINIT4 (CODE)
+                                    210 	.area GSINIT5 (CODE)
+                                    211 	.area GSINIT  (CODE)
+                                    212 	.area GSFINAL (CODE)
+                                    213 	.area CSEG    (CODE)
+                                    214 ;--------------------------------------------------------
+                                    215 ; global & static initialisations
+                                    216 ;--------------------------------------------------------
+                                    217 	.area HOME    (CODE)
+                                    218 	.area GSINIT  (CODE)
+                                    219 	.area GSFINAL (CODE)
+                                    220 	.area GSINIT  (CODE)
+                                    221 ;--------------------------------------------------------
+                                    222 ; Home
+                                    223 ;--------------------------------------------------------
+                                    224 	.area HOME    (CODE)
+                                    225 	.area HOME    (CODE)
+                                    226 ;--------------------------------------------------------
+                                    227 ; code
+                                    228 ;--------------------------------------------------------
+                                    229 	.area CSEG    (CODE)
+                                    230 ;------------------------------------------------------------
+                                    231 ;Allocation info for local variables in function 'Board_SetQuasiBidirectional'
+                                    232 ;------------------------------------------------------------
+                                    233 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:5: static void Board_SetQuasiBidirectional(void)
+                                    234 ;	-----------------------------------------
+                                    235 ;	 function Board_SetQuasiBidirectional
+                                    236 ;	-----------------------------------------
+      000125                        237 _Board_SetQuasiBidirectional:
+                           000007   238 	ar7 = 0x07
+                           000006   239 	ar6 = 0x06
+                           000005   240 	ar5 = 0x05
+                           000004   241 	ar4 = 0x04
+                           000003   242 	ar3 = 0x03
+                           000002   243 	ar2 = 0x02
+                           000001   244 	ar1 = 0x01
+                           000000   245 	ar0 = 0x00
+                                    246 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:7: P0M0 = 0x00U;
+      000125 75 94 00         [24]  247 	mov	_P0M0,#0x00
+                                    248 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:8: P0M1 = 0x00U;
+      000128 75 93 00         [24]  249 	mov	_P0M1,#0x00
+                                    250 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:9: P1M0 = 0x00U;
+      00012B 75 92 00         [24]  251 	mov	_P1M0,#0x00
+                                    252 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:10: P1M1 = 0x00U;
+      00012E 75 91 00         [24]  253 	mov	_P1M1,#0x00
+                                    254 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:11: P2M0 = 0x00U;
+      000131 75 96 00         [24]  255 	mov	_P2M0,#0x00
+                                    256 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:12: P2M1 = 0x00U;
+      000134 75 95 00         [24]  257 	mov	_P2M1,#0x00
+                                    258 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:13: P3M0 = 0x00U;
+      000137 75 B2 00         [24]  259 	mov	_P3M0,#0x00
+                                    260 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:14: P3M1 = 0x00U;
+      00013A 75 B1 00         [24]  261 	mov	_P3M1,#0x00
+                                    262 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:20: P0M0 |= 0x02U;  /* P01 DIG3 */
+      00013D 43 94 02         [24]  263 	orl	_P0M0,#0x02
+                                    264 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:21: P2M0 |= 0xFFU;  /* P20..P27 segments, green LED, DIG1/DIG2 */
+      000140 E5 96            [12]  265 	mov	a,_P2M0
+      000142 75 96 FF         [24]  266 	mov	_P2M0,#0xff
+                                    267 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:22: P3M0 |= 0xF0U;  /* P34 red LED, P35/P36/P37 segments */
+      000145 43 B2 F0         [24]  268 	orl	_P3M0,#0xf0
+                                    269 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:23: }
+      000148 22               [24]  270 	ret
+                                    271 ;------------------------------------------------------------
+                                    272 ;Allocation info for local variables in function 'Board_Init'
+                                    273 ;------------------------------------------------------------
+                                    274 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:25: void Board_Init(void)
+                                    275 ;	-----------------------------------------
+                                    276 ;	 function Board_Init
+                                    277 ;	-----------------------------------------
+      000149                        278 _Board_Init:
+                                    279 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:27: Board_SetQuasiBidirectional();
+      000149 12 01 25         [24]  280 	lcall	_Board_SetQuasiBidirectional
+                                    281 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:29: P02 = 1;
+                                    282 ;	assignBit
+      00014C D2 82            [12]  283 	setb	_P02
+                                    284 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:30: P03 = 1;
+                                    285 ;	assignBit
+      00014E D2 83            [12]  286 	setb	_P03
+                                    287 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:31: P12 = 1;
+                                    288 ;	assignBit
+      000150 D2 92            [12]  289 	setb	_P12
+                                    290 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:32: P13 = 1;
+                                    291 ;	assignBit
+      000152 D2 93            [12]  292 	setb	_P13
+                                    293 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:33: P14 = 1;
+                                    294 ;	assignBit
+      000154 D2 94            [12]  295 	setb	_P14
+                                    296 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:34: P15 = 1;
+                                    297 ;	assignBit
+      000156 D2 95            [12]  298 	setb	_P15
+                                    299 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:36: Board_RedLedSet(0U);
+      000158 75 82 00         [24]  300 	mov	dpl, #0x00
+      00015B 12 01 89         [24]  301 	lcall	_Board_RedLedSet
+                                    302 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:37: P22 = 1;
+                                    303 ;	assignBit
+      00015E D2 A2            [12]  304 	setb	_P22
+                                    305 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:38: }
+      000160 22               [24]  306 	ret
+                                    307 ;------------------------------------------------------------
+                                    308 ;Allocation info for local variables in function 'Board_ReadAddress'
+                                    309 ;------------------------------------------------------------
+                                    310 ;addr          Allocated to registers r7 
+                                    311 ;------------------------------------------------------------
+                                    312 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:40: uint8_t Board_ReadAddress(void)
+                                    313 ;	-----------------------------------------
+                                    314 ;	 function Board_ReadAddress
+                                    315 ;	-----------------------------------------
+      000161                        316 _Board_ReadAddress:
+                                    317 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:42: uint8_t addr = 0U;
+      000161 7F 00            [12]  318 	mov	r7,#0x00
+                                    319 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:44: if (P15 == 0) { addr |= 0x20U; }
+      000163 20 95 02         [24]  320 	jb	_P15,00102$
+      000166 7F 20            [12]  321 	mov	r7,#0x20
+      000168                        322 00102$:
+                                    323 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:45: if (P14 == 0) { addr |= 0x10U; }
+      000168 20 94 03         [24]  324 	jb	_P14,00104$
+      00016B 43 07 10         [24]  325 	orl	ar7,#0x10
+      00016E                        326 00104$:
+                                    327 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:46: if (P13 == 0) { addr |= 0x08U; }
+      00016E 20 93 03         [24]  328 	jb	_P13,00106$
+      000171 43 07 08         [24]  329 	orl	ar7,#0x08
+      000174                        330 00106$:
+                                    331 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:47: if (P12 == 0) { addr |= 0x04U; }
+      000174 20 92 03         [24]  332 	jb	_P12,00108$
+      000177 43 07 04         [24]  333 	orl	ar7,#0x04
+      00017A                        334 00108$:
+                                    335 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:48: if (P03 == 0) { addr |= 0x02U; }
+      00017A 20 83 03         [24]  336 	jb	_P03,00110$
+      00017D 43 07 02         [24]  337 	orl	ar7,#0x02
+      000180                        338 00110$:
+                                    339 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:49: if (P02 == 0) { addr |= 0x01U; }
+      000180 20 82 03         [24]  340 	jb	_P02,00112$
+      000183 43 07 01         [24]  341 	orl	ar7,#0x01
+      000186                        342 00112$:
+                                    343 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:51: return addr;
+      000186 8F 82            [24]  344 	mov	dpl, r7
+                                    345 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:52: }
+      000188 22               [24]  346 	ret
+                                    347 ;------------------------------------------------------------
+                                    348 ;Allocation info for local variables in function 'Board_RedLedSet'
+                                    349 ;------------------------------------------------------------
+                                    350 ;on            Allocated to registers r7 
+                                    351 ;------------------------------------------------------------
+                                    352 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:54: void Board_RedLedSet(uint8_t on)
+                                    353 ;	-----------------------------------------
+                                    354 ;	 function Board_RedLedSet
+                                    355 ;	-----------------------------------------
+      000189                        356 _Board_RedLedSet:
+                                    357 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:56: P34 = (on != 0U) ? 0 : 1;
+      000189 E5 82            [12]  358 	mov	a,dpl
+      00018B B4 01 00         [24]  359 	cjne	a,#0x01,00103$
+      00018E                        360 00103$:
+      00018E B3               [12]  361 	cpl	c
+      00018F 92 00            [24]  362 	mov	_Board_RedLedSet_sloc0_1_0,c
+      000191 B3               [12]  363 	cpl	c
+      000192 92 B4            [24]  364 	mov	_P34,c
+                                    365 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:57: }
+      000194 22               [24]  366 	ret
+                                    367 ;------------------------------------------------------------
+                                    368 ;Allocation info for local variables in function 'Board_GreenLedToggle'
+                                    369 ;------------------------------------------------------------
+                                    370 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:59: void Board_GreenLedToggle(void)
+                                    371 ;	-----------------------------------------
+                                    372 ;	 function Board_GreenLedToggle
+                                    373 ;	-----------------------------------------
+      000195                        374 _Board_GreenLedToggle:
+                                    375 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:61: P22 = !P22;
+      000195 B2 A2            [12]  376 	cpl	_P22
+                                    377 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:62: }
+      000197 22               [24]  378 	ret
+                                    379 ;------------------------------------------------------------
+                                    380 ;Allocation info for local variables in function 'Board_DelayMs'
+                                    381 ;------------------------------------------------------------
+                                    382 ;ms            Allocated to registers 
+                                    383 ;i             Allocated to registers r4 r5 
+                                    384 ;j             Allocated to registers r3 
+                                    385 ;------------------------------------------------------------
+                                    386 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:64: void Board_DelayMs(uint16_t ms)
+                                    387 ;	-----------------------------------------
+                                    388 ;	 function Board_DelayMs
+                                    389 ;	-----------------------------------------
+      000198                        390 _Board_DelayMs:
+      000198 AE 82            [24]  391 	mov	r6, dpl
+      00019A AF 83            [24]  392 	mov	r7, dph
+                                    393 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:69: while (ms-- != 0U) {
+      00019C                        394 00103$:
+      00019C 8E 04            [24]  395 	mov	ar4,r6
+      00019E 8F 05            [24]  396 	mov	ar5,r7
+      0001A0 1E               [12]  397 	dec	r6
+      0001A1 BE FF 01         [24]  398 	cjne	r6,#0xff,00158$
+      0001A4 1F               [12]  399 	dec	r7
+      0001A5                        400 00158$:
+      0001A5 EC               [12]  401 	mov	a,r4
+      0001A6 4D               [12]  402 	orl	a,r5
+      0001A7 60 1D            [24]  403 	jz	00111$
+                                    404 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:70: for (i = 0U; i < 500U; ++i) {
+      0001A9 7C 00            [12]  405 	mov	r4,#0x00
+      0001AB 7D 00            [12]  406 	mov	r5,#0x00
+                                    407 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:71: for (j = 0U; j < 2U; ++j) {
+      0001AD                        408 00120$:
+      0001AD 7B 02            [12]  409 	mov	r3,#0x02
+      0001AF                        410 00108$:
+                                    411 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:72: __asm nop __endasm;
+      0001AF 00               [12]  412 	nop	
+                                    413 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:71: for (j = 0U; j < 2U; ++j) {
+      0001B0 DB FD            [24]  414 	djnz	r3,00108$
+                                    415 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:70: for (i = 0U; i < 500U; ++i) {
+      0001B2 0C               [12]  416 	inc	r4
+      0001B3 BC 00 01         [24]  417 	cjne	r4,#0x00,00161$
+      0001B6 0D               [12]  418 	inc	r5
+      0001B7                        419 00161$:
+      0001B7 8C 02            [24]  420 	mov	ar2,r4
+      0001B9 8D 03            [24]  421 	mov	ar3,r5
+      0001BB C3               [12]  422 	clr	c
+      0001BC EA               [12]  423 	mov	a,r2
+      0001BD 94 F4            [12]  424 	subb	a,#0xf4
+      0001BF EB               [12]  425 	mov	a,r3
+      0001C0 94 01            [12]  426 	subb	a,#0x01
+      0001C2 40 E9            [24]  427 	jc	00120$
+      0001C4 80 D6            [24]  428 	sjmp	00103$
+      0001C6                        429 00111$:
+                                    430 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/board.c:76: }
+      0001C6 22               [24]  431 	ret
+                                    432 	.area CSEG    (CODE)
+                                    433 	.area CONST   (CODE)
+                                    434 	.area XINIT   (CODE)
+                                    435 	.area CABS    (ABS,CODE)

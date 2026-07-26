@@ -1,0 +1,355 @@
+                                      1 ;--------------------------------------------------------
+                                      2 ; File Created by SDCC : free open source ISO C Compiler
+                                      3 ; Version 4.6.0 #16555 (Linux)
+                                      4 ;--------------------------------------------------------
+                                      5 	.module crc16
+                                      6 	
+                                      7 	.optsdcc -mmcs51 --model-small
+                                      8 ;--------------------------------------------------------
+                                      9 ; Public variables in this module
+                                     10 ;--------------------------------------------------------
+                                     11 	.globl _Crc16_Modbus_PARM_2
+                                     12 	.globl _Crc16_Append_PARM_2
+                                     13 	.globl _Crc16_Check_PARM_2
+                                     14 	.globl _Crc16_Modbus
+                                     15 	.globl _Crc16_Check
+                                     16 	.globl _Crc16_Append
+                                     17 ;--------------------------------------------------------
+                                     18 ; special function registers
+                                     19 ;--------------------------------------------------------
+                                     20 	.area RSEG    (ABS,DATA)
+      000000                         21 	.org 0x0000
+                                     22 ;--------------------------------------------------------
+                                     23 ; special function bits
+                                     24 ;--------------------------------------------------------
+                                     25 	.area RSEG    (ABS,DATA)
+      000000                         26 	.org 0x0000
+                                     27 ;--------------------------------------------------------
+                                     28 ; overlayable register banks
+                                     29 ;--------------------------------------------------------
+                                     30 	.area REG_BANK_0	(REL,OVR,DATA)
+      000000                         31 	.ds 8
+                                     32 ;--------------------------------------------------------
+                                     33 ; internal ram data
+                                     34 ;--------------------------------------------------------
+                                     35 	.area DSEG    (DATA)
+      000000                         36 _Crc16_Check_PARM_2:
+      000000                         37 	.ds 1
+      000001                         38 _Crc16_Check_crc_10000_14:
+      000001                         39 	.ds 2
+      000003                         40 _Crc16_Append_PARM_2:
+      000003                         41 	.ds 1
+      000004                         42 _Crc16_Append_crc_10000_18:
+      000004                         43 	.ds 2
+                                     44 ;--------------------------------------------------------
+                                     45 ; overlayable items in internal ram
+                                     46 ;--------------------------------------------------------
+                                     47 	.area	OSEG    (OVR,DATA)
+      000000                         48 _Crc16_Modbus_PARM_2:
+      000000                         49 	.ds 1
+      000001                         50 _Crc16_Modbus_data_10000_4:
+      000001                         51 	.ds 3
+                                     52 ;--------------------------------------------------------
+                                     53 ; indirectly addressable internal ram data
+                                     54 ;--------------------------------------------------------
+                                     55 	.area ISEG    (DATA)
+                                     56 ;--------------------------------------------------------
+                                     57 ; absolute internal ram data
+                                     58 ;--------------------------------------------------------
+                                     59 	.area IABS    (ABS,DATA)
+                                     60 	.area IABS    (ABS,DATA)
+                                     61 ;--------------------------------------------------------
+                                     62 ; bit data
+                                     63 ;--------------------------------------------------------
+                                     64 	.area BSEG    (BIT)
+                                     65 ;--------------------------------------------------------
+                                     66 ; paged external ram data
+                                     67 ;--------------------------------------------------------
+                                     68 	.area PSEG    (PAG,XDATA)
+                                     69 ;--------------------------------------------------------
+                                     70 ; uninitialized external ram data
+                                     71 ;--------------------------------------------------------
+                                     72 	.area XSEG    (XDATA)
+                                     73 ;--------------------------------------------------------
+                                     74 ; absolute external ram data
+                                     75 ;--------------------------------------------------------
+                                     76 	.area XABS    (ABS,XDATA)
+                                     77 ;--------------------------------------------------------
+                                     78 ; initialized external ram data
+                                     79 ;--------------------------------------------------------
+                                     80 	.area XISEG   (XDATA)
+                                     81 	.area HOME    (CODE)
+                                     82 	.area GSINIT0 (CODE)
+                                     83 	.area GSINIT1 (CODE)
+                                     84 	.area GSINIT2 (CODE)
+                                     85 	.area GSINIT3 (CODE)
+                                     86 	.area GSINIT4 (CODE)
+                                     87 	.area GSINIT5 (CODE)
+                                     88 	.area GSINIT  (CODE)
+                                     89 	.area GSFINAL (CODE)
+                                     90 	.area CSEG    (CODE)
+                                     91 ;--------------------------------------------------------
+                                     92 ; global & static initialisations
+                                     93 ;--------------------------------------------------------
+                                     94 	.area HOME    (CODE)
+                                     95 	.area GSINIT  (CODE)
+                                     96 	.area GSFINAL (CODE)
+                                     97 	.area GSINIT  (CODE)
+                                     98 ;--------------------------------------------------------
+                                     99 ; Home
+                                    100 ;--------------------------------------------------------
+                                    101 	.area HOME    (CODE)
+                                    102 	.area HOME    (CODE)
+                                    103 ;--------------------------------------------------------
+                                    104 ; code
+                                    105 ;--------------------------------------------------------
+                                    106 	.area CSEG    (CODE)
+                                    107 ;------------------------------------------------------------
+                                    108 ;Allocation info for local variables in function 'Crc16_Modbus'
+                                    109 ;------------------------------------------------------------
+                                    110 ;len           Allocated with name '_Crc16_Modbus_PARM_2'
+                                    111 ;data          Allocated with name '_Crc16_Modbus_data_10000_4'
+                                    112 ;crc           Allocated to registers r3 r4 
+                                    113 ;i             Allocated to registers r2 
+                                    114 ;bit           Allocated to registers r7 
+                                    115 ;------------------------------------------------------------
+                                    116 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:3: uint16_t Crc16_Modbus(const uint8_t *data, uint8_t len)
+                                    117 ;	-----------------------------------------
+                                    118 ;	 function Crc16_Modbus
+                                    119 ;	-----------------------------------------
+      000000                        120 _Crc16_Modbus:
+                           000007   121 	ar7 = 0x07
+                           000006   122 	ar6 = 0x06
+                           000005   123 	ar5 = 0x05
+                           000004   124 	ar4 = 0x04
+                           000003   125 	ar3 = 0x03
+                           000002   126 	ar2 = 0x02
+                           000001   127 	ar1 = 0x01
+                           000000   128 	ar0 = 0x00
+      000000 85 82*01         [24]  129 	mov	_Crc16_Modbus_data_10000_4,dpl
+      000003 85 83*02         [24]  130 	mov	(_Crc16_Modbus_data_10000_4 + 1),dph
+      000006 85 F0*03         [24]  131 	mov	(_Crc16_Modbus_data_10000_4 + 2),b
+                                    132 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:5: uint16_t crc = 0xFFFFU;
+      000009 7B FF            [12]  133 	mov	r3,#0xff
+      00000B 7C FF            [12]  134 	mov	r4,#0xff
+                                    135 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:9: for (i = 0U; i < len; ++i) {
+      00000D 7A 00            [12]  136 	mov	r2,#0x00
+      00000F                        137 00109$:
+      00000F C3               [12]  138 	clr	c
+      000010 EA               [12]  139 	mov	a,r2
+      000011 95*00            [12]  140 	subb	a,_Crc16_Modbus_PARM_2
+      000013 50 45            [24]  141 	jnc	00105$
+                                    142 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:10: crc ^= data[i];
+      000015 EA               [12]  143 	mov	a,r2
+      000016 25*01            [12]  144 	add	a, _Crc16_Modbus_data_10000_4
+      000018 F8               [12]  145 	mov	r0,a
+      000019 E4               [12]  146 	clr	a
+      00001A 35*02            [12]  147 	addc	a, (_Crc16_Modbus_data_10000_4 + 1)
+      00001C F9               [12]  148 	mov	r1,a
+      00001D AF*03            [24]  149 	mov	r7,(_Crc16_Modbus_data_10000_4 + 2)
+      00001F 88 82            [24]  150 	mov	dpl,r0
+      000021 89 83            [24]  151 	mov	dph,r1
+      000023 8F F0            [24]  152 	mov	b,r7
+      000025 12r00r00         [24]  153 	lcall	__gptrget
+      000028 7F 00            [12]  154 	mov	r7,#0x00
+      00002A 62 03            [12]  155 	xrl	ar3,a
+      00002C EF               [12]  156 	mov	a,r7
+      00002D 62 04            [12]  157 	xrl	ar4,a
+                                    158 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:11: for (bit = 0U; bit < 8U; ++bit) {
+      00002F 7F 00            [12]  159 	mov	r7,#0x00
+      000031                        160 00106$:
+                                    161 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:12: if ((crc & 0x0001U) != 0U) {
+      000031 EB               [12]  162 	mov	a,r3
+      000032 30 E0 15         [24]  163 	jnb	acc.0,00102$
+                                    164 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:13: crc = (uint16_t)((crc >> 1) ^ 0xA001U);
+      000035 8B 05            [24]  165 	mov	ar5,r3
+      000037 EC               [12]  166 	mov	a,r4
+      000038 C3               [12]  167 	clr	c
+      000039 13               [12]  168 	rrc	a
+      00003A CD               [12]  169 	xch	a,r5
+      00003B 13               [12]  170 	rrc	a
+      00003C CD               [12]  171 	xch	a,r5
+      00003D FE               [12]  172 	mov	r6,a
+      00003E 63 05 01         [24]  173 	xrl	ar5,#0x01
+      000041 63 06 A0         [24]  174 	xrl	ar6,#0xa0
+      000044 8D 03            [24]  175 	mov	ar3,r5
+      000046 8E 04            [24]  176 	mov	ar4,r6
+      000048 80 07            [24]  177 	sjmp	00107$
+      00004A                        178 00102$:
+                                    179 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:15: crc >>= 1;
+      00004A EC               [12]  180 	mov	a,r4
+      00004B C3               [12]  181 	clr	c
+      00004C 13               [12]  182 	rrc	a
+      00004D CB               [12]  183 	xch	a,r3
+      00004E 13               [12]  184 	rrc	a
+      00004F CB               [12]  185 	xch	a,r3
+      000050 FC               [12]  186 	mov	r4,a
+      000051                        187 00107$:
+                                    188 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:11: for (bit = 0U; bit < 8U; ++bit) {
+      000051 0F               [12]  189 	inc	r7
+      000052 BF 08 00         [24]  190 	cjne	r7,#0x08,00152$
+      000055                        191 00152$:
+      000055 40 DA            [24]  192 	jc	00106$
+                                    193 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:9: for (i = 0U; i < len; ++i) {
+      000057 0A               [12]  194 	inc	r2
+      000058 80 B5            [24]  195 	sjmp	00109$
+      00005A                        196 00105$:
+                                    197 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:20: return crc;
+      00005A 8B 82            [24]  198 	mov	dpl, r3
+      00005C 8C 83            [24]  199 	mov	dph, r4
+                                    200 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:21: }
+      00005E 22               [24]  201 	ret
+                                    202 ;------------------------------------------------------------
+                                    203 ;Allocation info for local variables in function 'Crc16_Check'
+                                    204 ;------------------------------------------------------------
+                                    205 ;len           Allocated with name '_Crc16_Check_PARM_2'
+                                    206 ;frame         Allocated to registers r5 r6 r7 
+                                    207 ;crc           Allocated with name '_Crc16_Check_crc_10000_14'
+                                    208 ;------------------------------------------------------------
+                                    209 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:23: uint8_t Crc16_Check(const uint8_t *frame, uint8_t len)
+                                    210 ;	-----------------------------------------
+                                    211 ;	 function Crc16_Check
+                                    212 ;	-----------------------------------------
+      00005F                        213 _Crc16_Check:
+      00005F AD 82            [24]  214 	mov	r5, dpl
+      000061 AE 83            [24]  215 	mov	r6, dph
+      000063 AF F0            [24]  216 	mov	r7, b
+                                    217 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:27: if ((frame == 0) || (len < 3U)) {
+      000065 ED               [12]  218 	mov	a,r5
+      000066 4E               [12]  219 	orl	a,r6
+      000067 60 06            [24]  220 	jz	00101$
+      000069 74 FD            [12]  221 	mov	a,#0x100 - 0x03
+      00006B 25*00            [12]  222 	add	a,_Crc16_Check_PARM_2
+      00006D 40 04            [24]  223 	jc	00102$
+      00006F                        224 00101$:
+                                    225 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:28: return 0U;
+      00006F 75 82 00         [24]  226 	mov	dpl, #0x00
+      000072 22               [24]  227 	ret
+      000073                        228 00102$:
+                                    229 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:31: crc = Crc16_Modbus(frame, (uint8_t)(len - 2U));
+      000073 E5*00            [12]  230 	mov	a,_Crc16_Check_PARM_2
+      000075 24 FE            [12]  231 	add	a,#0xfe
+      000077 F5*00            [12]  232 	mov	_Crc16_Modbus_PARM_2,a
+      000079 8D 82            [24]  233 	mov	dpl, r5
+      00007B 8E 83            [24]  234 	mov	dph, r6
+      00007D 8F F0            [24]  235 	mov	b, r7
+      00007F C0 07            [24]  236 	push	ar7
+      000081 C0 06            [24]  237 	push	ar6
+      000083 C0 05            [24]  238 	push	ar5
+      000085 12r00r00         [24]  239 	lcall	_Crc16_Modbus
+      000088 85 82*01         [24]  240 	mov	_Crc16_Check_crc_10000_14,dpl
+      00008B 85 83*02         [24]  241 	mov	(_Crc16_Check_crc_10000_14 + 1),dph
+      00008E D0 05            [24]  242 	pop	ar5
+      000090 D0 06            [24]  243 	pop	ar6
+      000092 D0 07            [24]  244 	pop	ar7
+                                    245 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:32: return ((frame[len - 2U] == (uint8_t)crc) &&
+      000094 A9*00            [24]  246 	mov	r1,_Crc16_Check_PARM_2
+      000096 7A 00            [12]  247 	mov	r2,#0x00
+      000098 E9               [12]  248 	mov	a,r1
+      000099 24 FE            [12]  249 	add	a,#0xfe
+      00009B F8               [12]  250 	mov	r0,a
+      00009C EA               [12]  251 	mov	a,r2
+      00009D 34 FF            [12]  252 	addc	a,#0xff
+      00009F FC               [12]  253 	mov	r4,a
+      0000A0 E8               [12]  254 	mov	a,r0
+      0000A1 2D               [12]  255 	add	a, r5
+      0000A2 F8               [12]  256 	mov	r0,a
+      0000A3 EC               [12]  257 	mov	a,r4
+      0000A4 3E               [12]  258 	addc	a, r6
+      0000A5 FC               [12]  259 	mov	r4,a
+      0000A6 8F 03            [24]  260 	mov	ar3,r7
+      0000A8 88 82            [24]  261 	mov	dpl,r0
+      0000AA 8C 83            [24]  262 	mov	dph,r4
+      0000AC 8B F0            [24]  263 	mov	b,r3
+      0000AE 12r00r00         [24]  264 	lcall	__gptrget
+      0000B1 AB*01            [24]  265 	mov	r3,_Crc16_Check_crc_10000_14
+      0000B3 B5 03 1D         [24]  266 	cjne	a,ar3,00106$
+                                    267 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:33: (frame[len - 1U] == (uint8_t)(crc >> 8))) ? 1U : 0U;
+      0000B6 19               [12]  268 	dec	r1
+      0000B7 B9 FF 01         [24]  269 	cjne	r1,#0xff,00135$
+      0000BA 1A               [12]  270 	dec	r2
+      0000BB                        271 00135$:
+      0000BB E9               [12]  272 	mov	a,r1
+      0000BC 2D               [12]  273 	add	a, r5
+      0000BD FD               [12]  274 	mov	r5,a
+      0000BE EA               [12]  275 	mov	a,r2
+      0000BF 3E               [12]  276 	addc	a, r6
+      0000C0 FE               [12]  277 	mov	r6,a
+      0000C1 8D 82            [24]  278 	mov	dpl,r5
+      0000C3 8E 83            [24]  279 	mov	dph,r6
+      0000C5 8F F0            [24]  280 	mov	b,r7
+      0000C7 12r00r00         [24]  281 	lcall	__gptrget
+      0000CA AF*02            [24]  282 	mov	r7,(_Crc16_Check_crc_10000_14 + 1)
+      0000CC B5 07 04         [24]  283 	cjne	a,ar7,00106$
+      0000CF 7F 01            [12]  284 	mov	r7,#0x01
+      0000D1 80 02            [24]  285 	sjmp	00107$
+      0000D3                        286 00106$:
+      0000D3 7F 00            [12]  287 	mov	r7,#0x00
+      0000D5                        288 00107$:
+      0000D5 8F 82            [24]  289 	mov	dpl,r7
+                                    290 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:34: }
+      0000D7 22               [24]  291 	ret
+                                    292 ;------------------------------------------------------------
+                                    293 ;Allocation info for local variables in function 'Crc16_Append'
+                                    294 ;------------------------------------------------------------
+                                    295 ;payload_len   Allocated with name '_Crc16_Append_PARM_2'
+                                    296 ;frame         Allocated to registers r5 r6 r7 
+                                    297 ;crc           Allocated with name '_Crc16_Append_crc_10000_18'
+                                    298 ;------------------------------------------------------------
+                                    299 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:36: void Crc16_Append(uint8_t *frame, uint8_t payload_len)
+                                    300 ;	-----------------------------------------
+                                    301 ;	 function Crc16_Append
+                                    302 ;	-----------------------------------------
+      0000D8                        303 _Crc16_Append:
+                                    304 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:38: uint16_t crc = Crc16_Modbus(frame, payload_len);
+      0000D8 AD 82            [24]  305 	mov	r5,dpl
+      0000DA AE 83            [24]  306 	mov	r6,dph
+      0000DC AF F0            [24]  307 	mov	r7,b
+      0000DE 85*03*00         [24]  308 	mov	_Crc16_Modbus_PARM_2,_Crc16_Append_PARM_2
+      0000E1 C0 07            [24]  309 	push	ar7
+      0000E3 C0 06            [24]  310 	push	ar6
+      0000E5 C0 05            [24]  311 	push	ar5
+      0000E7 12r00r00         [24]  312 	lcall	_Crc16_Modbus
+      0000EA 85 82*04         [24]  313 	mov	_Crc16_Append_crc_10000_18,dpl
+      0000ED 85 83*05         [24]  314 	mov	(_Crc16_Append_crc_10000_18 + 1),dph
+      0000F0 D0 05            [24]  315 	pop	ar5
+      0000F2 D0 06            [24]  316 	pop	ar6
+      0000F4 D0 07            [24]  317 	pop	ar7
+                                    318 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:39: frame[payload_len] = (uint8_t)crc;
+      0000F6 E5*03            [12]  319 	mov	a,_Crc16_Append_PARM_2
+      0000F8 2D               [12]  320 	add	a, r5
+      0000F9 F8               [12]  321 	mov	r0,a
+      0000FA E4               [12]  322 	clr	a
+      0000FB 3E               [12]  323 	addc	a, r6
+      0000FC F9               [12]  324 	mov	r1,a
+      0000FD 8F 02            [24]  325 	mov	ar2,r7
+      0000FF AC*04            [24]  326 	mov	r4,_Crc16_Append_crc_10000_18
+      000101 88 82            [24]  327 	mov	dpl,r0
+      000103 89 83            [24]  328 	mov	dph,r1
+      000105 8A F0            [24]  329 	mov	b,r2
+      000107 EC               [12]  330 	mov	a,r4
+      000108 12r00r00         [24]  331 	lcall	__gptrput
+                                    332 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:40: frame[payload_len + 1U] = (uint8_t)(crc >> 8);
+      00010B AC*03            [24]  333 	mov	r4,_Crc16_Append_PARM_2
+      00010D 7B 00            [12]  334 	mov	r3,#0x00
+      00010F 0C               [12]  335 	inc	r4
+      000110 BC 00 01         [24]  336 	cjne	r4,#0x00,00103$
+      000113 0B               [12]  337 	inc	r3
+      000114                        338 00103$:
+      000114 EC               [12]  339 	mov	a,r4
+      000115 2D               [12]  340 	add	a, r5
+      000116 FD               [12]  341 	mov	r5,a
+      000117 EB               [12]  342 	mov	a,r3
+      000118 3E               [12]  343 	addc	a, r6
+      000119 FE               [12]  344 	mov	r6,a
+      00011A AC*05            [24]  345 	mov	r4,(_Crc16_Append_crc_10000_18 + 1)
+      00011C 8D 82            [24]  346 	mov	dpl,r5
+      00011E 8E 83            [24]  347 	mov	dph,r6
+      000120 8F F0            [24]  348 	mov	b,r7
+      000122 EC               [12]  349 	mov	a,r4
+                                    350 ;	/home/keake/Projects/WindPressureDetectionSystem/风压传感器/src/crc16.c:41: }
+      000123 02r00r00         [24]  351 	ljmp	__gptrput
+                                    352 	.area CSEG    (CODE)
+                                    353 	.area CONST   (CODE)
+                                    354 	.area XINIT   (CODE)
+                                    355 	.area CABS    (ABS,CODE)

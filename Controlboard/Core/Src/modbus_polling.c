@@ -6,7 +6,9 @@
   *
   * 轮询策略：
   *   [顺序轮询] 依次扫描地址 0 → 1 → 2 → ... → 63 → 0 → ...
-  *              使用 0x03 读保持寄存器，寄存器 0x0000，数量 1。
+ *              使用 0x03 读保持寄存器，寄存器 0x0001，数量 1。
+ *              统一读 0x0001 以兼容旧版 CO；新版风压同时兼容
+ *              0x0000 和 0x0001。
   *   [在线穿插] 每进行 POLL_SEQUENTIAL_BETWEEN_ONLINE 次顺序地址轮询，
   *              插入一次已标记在线的传感器轮询，提高其数据更新频率。
   *
@@ -88,9 +90,10 @@ void TaskModbusPoll(void *arg)
 
     ModbusRequest_t req;
 
-    /* 请求模板：功能码 0x03，寄存器 0x0000，读 1 个寄存器 */
+    /* 请求模板：功能码 0x03，寄存器 0x0001，读 1 个寄存器。
+     * 旧版 CO 的浓度值位于 Reg[1]，其余传感器均可响应此请求。 */
     req.func_code = MODBUS_FUNC_READ_HOLDING_REGISTERS;
-    req.reg_addr  = 0x0000;
+    req.reg_addr  = 0x0001;
     req.reg_value = 0x0001;
 
     /* GREEN_LED 闪烁计数器（低电平点亮） */

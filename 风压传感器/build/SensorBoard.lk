@@ -1,0 +1,24 @@
+-muwx
+-i /home/keake/Projects/WindPressureDetectionSystem/风压传感器/build/SensorBoard.ihx
+-M
+-b HOME = 0x0000
+-b XSEG = 0x0001
+-b PSEG = 0x0001
+-b ISEG = 0x0000
+-b BSEG = 0x0000
+-k /usr/bin/../share/sdcc/lib/small
+-k /usr/share/sdcc/lib/small
+-l mcs51
+-l libsdcc
+-l libint
+-l liblong
+-l libfloat
+/home/keake/Projects/WindPressureDetectionSystem/风压传感器/build/main.rel
+/home/keake/Projects/WindPressureDetectionSystem/风压传感器/build/board.rel
+/home/keake/Projects/WindPressureDetectionSystem/风压传感器/build/crc16.rel
+/home/keake/Projects/WindPressureDetectionSystem/风压传感器/build/display.rel
+/home/keake/Projects/WindPressureDetectionSystem/风压传感器/build/pressure.rel
+/home/keake/Projects/WindPressureDetectionSystem/风压传感器/build/sensor_modbus.rel
+/home/keake/Projects/WindPressureDetectionSystem/风压传感器/build/uart.rel
+
+-e
