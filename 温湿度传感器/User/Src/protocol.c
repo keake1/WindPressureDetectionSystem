@@ -76,7 +76,7 @@ void Protocol_Process(void)
         case PROTO_FUNC_03:
         {
             /*
-             * 应答帧（10字节）：
+             * 应答帧（10字节，Controlboard 兼容格式）：
              *   [0]    设备地址
              *   [1]    功能码 0x03
              *   [2]    数据字节数 = 5（型号 + 温度 + 湿度）
@@ -91,7 +91,7 @@ void Protocol_Process(void)
             tx_buf[0] = g_device_addr;
             tx_buf[1] = PROTO_FUNC_03;
             tx_buf[2] = 5;
-            tx_buf[3] = 0x05;//型号
+            tx_buf[3] = 0x05;
             tx_buf[4] = (unsigned char)((g_aht30.temperature >> 8) & 0xFF);
             tx_buf[5] = (unsigned char)(g_aht30.temperature & 0xFF);
             tx_buf[6] = (unsigned char)((g_aht30.humidity >> 8) & 0xFF);
@@ -110,7 +110,7 @@ void Protocol_Process(void)
              * 0x06 写控制命令
              * [2~3] 寄存器地址：0x00 0x04
              * [4~5] 写入值：0x00 0x01=点亮红灯  0x00 0x00=熄灭红灯
-             * 应答：原帧回显（8字节）
+             * 当前节点执行后不回传确认帧。
              */
             unsigned int reg_addr = (unsigned int)g_uart_rx_buf[2] << 8 | g_uart_rx_buf[3];
             unsigned int reg_val  = (unsigned int)g_uart_rx_buf[4] << 8 | g_uart_rx_buf[5];

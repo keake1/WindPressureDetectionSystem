@@ -1,6 +1,7 @@
 #include <STC8H.H>
 #include "timer.h"
 #include "task.h"
+#include "digital_tube.h"
 
 /*
  * 定时器0 配置（@11.0592MHz，1T模式，模式0 16位自动重载）
@@ -31,6 +32,7 @@ void Timer0_Init(void)
 /* 定时器0中断服务函数（每 1ms 触发一次） */
 void Timer0_ISR(void) interrupt 1
 {
+    DigitalTube_Scan1ms();
     Task_1ms();     /* 1ms 任务：直接在中断中执行，响应最及时 */
     cnt_10ms++;
     cnt_50ms++;

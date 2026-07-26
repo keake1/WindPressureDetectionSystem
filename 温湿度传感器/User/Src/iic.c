@@ -8,7 +8,7 @@
  * 参考官方 AHT2x 例程时序：SCL高持续4us，低持续2us
  */
 
-/* 微秒级延时（@24MHz，约1us/次） */
+/* 微秒级延时（@11.0592MHz，约1us/次） */
 static void iic_delay(unsigned char us)
 {
     while(us--)

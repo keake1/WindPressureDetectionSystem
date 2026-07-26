@@ -4,6 +4,7 @@
 #include "uart.h"
 #include "aht30.h"
 #include "protocol.h"
+#include "digital_tube.h"
 
 /* ---------- 1ms 任务：串口超时判断 + 协议处理（在定时器中断中调用） ---------- */
 void Task_1ms(void)
@@ -24,7 +25,7 @@ void Task_50ms(void)
     /* TODO: 放需要每 50ms 执行一次的代码 */
 }
 
-/* ---------- 100ms 任务：读取拨码地址并通过串口上报 ---------- */
+/* ---------- 100ms 任务：读取拨码地址 ---------- */
 void Task_100ms(void)
 {
     g_device_addr = Read_DeviceAddr();   /* 每 100ms 更新一次设备地址 */
@@ -40,5 +41,24 @@ void Task_500ms(void)
 /* ---------- 1000ms 任务：读取 AHT30 数据 ---------- */
 void Task_1000ms(void)
 {
+    static unsigned char show_humidity = 0;
+    static unsigned char display_seconds = 0;
+
     AHT30_Read();          /* 读取并解析数据，更新全局变量 g_aht30 */
+
+    display_seconds++;
+    if(display_seconds >= 3)
+    {
+        display_seconds = 0;
+        show_humidity = !show_humidity;
+    }
+
+    if(show_humidity)
+    {
+        DigitalTube_SetValue(g_aht30.humidity);
+    }
+    else
+    {
+        DigitalTube_SetValue(g_aht30.temperature);
+    }
 }

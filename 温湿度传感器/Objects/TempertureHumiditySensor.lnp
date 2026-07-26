@@ -1,0 +1,13 @@
+".\Objects\STARTUP.obj",
+".\Objects\main.obj",
+".\Objects\gpio.obj",
+".\Objects\digital_tube.obj",
+".\Objects\task.obj",
+".\Objects\timer.obj",
+".\Objects\uart.obj",
+".\Objects\aht30.obj",
+".\Objects\iic.obj",
+".\Objects\protocol.obj" 
+TO ".\Objects\TempertureHumiditySensor" 
+
+PRINT(".\Listings\TempertureHumiditySensor.map")

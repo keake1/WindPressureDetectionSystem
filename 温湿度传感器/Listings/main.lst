@@ -1,10 +1,10 @@
-C51 COMPILER V9.60.7.0   MAIN                                                              06/27/2026 19:48:43 PAGE 1   
+C51 COMPILER V9.60.7.0   MAIN                                                              07/26/2026 14:00:13 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MAIN
 OBJECT MODULE PLACED IN .\Objects\main.obj
-COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE User\Src\main.c OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\User\Inc) DEBUG P
-                    -RINT(.\Listings\main.lst) TABS(2) OBJECT(.\Objects\main.obj)
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE User\Src\main.c COMPACT OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\User\Inc)
+                    - DEBUG PRINT(.\Listings\main.lst) TABS(2) OBJECT(.\Objects\main.obj)
 
 line level    source
 
@@ -16,94 +16,96 @@ line level    source
    6          #include "iic.h"
    7          #include "aht30.h"
    8          #include "protocol.h"
-   9          
-  10          void Delay1ms(void);
-  11          void DelayMs(unsigned int ms);
-  12          
+   9          #include "digital_tube.h"
+  10          
+  11          void Delay1ms(void);
+  12          void DelayMs(unsigned int ms);
   13          
-  14          #define FOSC  11059200UL   /* 11.0592 MHz，与 STC-ISP 中设置保持一致 */
-  15          
-  16          void main()
-  17          {
-  18   1          GPIO_Init();    /* 初始化 GPIO */
-  19   1          Uart1_Init();   /* 初始化串口1，9600bps */
-  20   1          IIC_Init();     /* 初始化软件模拟 I²C */
-  21   1          DelayMs(100);   /* 等待 AHT30 上电稳定（手册要求 ≥100ms） */
-  22   1          AHT30_Init();   /* 初始化 AHT30 温湿度传感器 */
-  23   1          Timer0_Init();  /* 初始化定时器0，1ms 中断 */
-  24   1          EA = 1;         /* 开总中断 */
-  25   1          DelayMs(200);
-  26   1          while(1)
-  27   1          {
-  28   2              /* 10ms 任务 */
-  29   2              if(cnt_10ms >= 10)
-  30   2              {
-  31   3                  cnt_10ms = 0;
-  32   3                  Task_10ms();
-  33   3              }
-  34   2      
-  35   2              /* 50ms 任务 */
-  36   2              if(cnt_50ms >= 50)
-  37   2              {
-  38   3                  cnt_50ms = 0;
-  39   3                  Task_50ms();
-  40   3              }
-  41   2      
-  42   2              /* 100ms 任务 */
-  43   2              if(cnt_100ms >= 100)
-  44   2              {
-  45   3                  cnt_100ms = 0;
-  46   3                  Task_100ms();
-  47   3              }
-  48   2      
-  49   2              /* 500ms 任务 */
-  50   2              if(cnt_500ms >= 500)
-  51   2              {
-  52   3                  cnt_500ms = 0;
-  53   3                  Task_500ms();
-  54   3              }
-C51 COMPILER V9.60.7.0   MAIN                                                              06/27/2026 19:48:43 PAGE 2   
+  14          
+  15          #define FOSC  11059200UL   /* 11.0592 MHz，与 STC-ISP 中设置保持一致 */
+  16          
+  17          void main()
+  18          {
+  19   1          GPIO_Init();    /* 初始化 GPIO */
+  20   1          DigitalTube_Init(); /* 初始化三位动态数码管 */
+  21   1          Uart1_Init();   /* 初始化串口1，9600bps */
+  22   1          IIC_Init();     /* 初始化软件模拟 I²C */
+  23   1          DelayMs(100);   /* 等待 AHT30 上电稳定（手册要求 ≥100ms） */
+  24   1          AHT30_Init();   /* 初始化 AHT30 温湿度传感器 */
+  25   1          Timer0_Init();  /* 初始化定时器0，1ms 中断 */
+  26   1          EA = 1;         /* 开总中断 */
+  27   1          DelayMs(200);
+  28   1          while(1)
+  29   1          {
+  30   2              /* 10ms 任务 */
+  31   2              if(cnt_10ms >= 10)
+  32   2              {
+  33   3                  cnt_10ms = 0;
+  34   3                  Task_10ms();
+  35   3              }
+  36   2      
+  37   2              /* 50ms 任务 */
+  38   2              if(cnt_50ms >= 50)
+  39   2              {
+  40   3                  cnt_50ms = 0;
+  41   3                  Task_50ms();
+  42   3              }
+  43   2      
+  44   2              /* 100ms 任务 */
+  45   2              if(cnt_100ms >= 100)
+  46   2              {
+  47   3                  cnt_100ms = 0;
+  48   3                  Task_100ms();
+  49   3              }
+  50   2      
+  51   2              /* 500ms 任务 */
+  52   2              if(cnt_500ms >= 500)
+  53   2              {
+  54   3                  cnt_500ms = 0;
+C51 COMPILER V9.60.7.0   MAIN                                                              07/26/2026 14:00:13 PAGE 2   
 
-  55   2      
-  56   2              /* 1000ms 任务 */
-  57   2              if(cnt_1000ms >= 1000)
-  58   2              {
-  59   3                  cnt_1000ms = 0;
-  60   3                  Task_1000ms();
-  61   3              }
-  62   2          }
-  63   1      }
-  64          
-  65          void Delay1ms(void) //@11.0592MHz
-  66          {
-  67   1        unsigned char data i, j;
-  68   1      
-  69   1        _nop_();
-  70   1        i = 15;
-  71   1        j = 90;
-  72   1        do
-  73   1        {
-  74   2          while (--j);
-  75   2        } while (--i);
-  76   1      }
-  77          
-  78          /* 通用毫秒延时：调用 Delay1ms() ms 次，最大延时 65535ms */
-  79          void DelayMs(unsigned int ms)
-  80          {
-  81   1          while (ms--)
-  82   1          {
-  83   2              Delay1ms();
-  84   2          }
-  85   1      }
-  86          
+  55   3                  Task_500ms();
+  56   3              }
+  57   2      
+  58   2              /* 1000ms 任务 */
+  59   2              if(cnt_1000ms >= 1000)
+  60   2              {
+  61   3                  cnt_1000ms = 0;
+  62   3                  Task_1000ms();
+  63   3              }
+  64   2          }
+  65   1      }
+  66          
+  67          void Delay1ms(void) //@11.0592MHz
+  68          {
+  69   1        unsigned char data i, j;
+  70   1      
+  71   1        _nop_();
+  72   1        i = 15;
+  73   1        j = 90;
+  74   1        do
+  75   1        {
+  76   2          while (--j);
+  77   2        } while (--i);
+  78   1      }
+  79          
+  80          /* 通用毫秒延时：调用 Delay1ms() ms 次，最大延时 65535ms */
+  81          void DelayMs(unsigned int ms)
+  82          {
+  83   1          while (ms--)
+  84   1          {
+  85   2              Delay1ms();
+  86   2          }
+  87   1      }
+  88          
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =    158    ----
+   CODE SIZE        =    161    ----
    CONSTANT SIZE    =   ----    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =   ----    ----
-   DATA SIZE        =   ----    ----
+   DATA SIZE        =   ----       2
    IDATA SIZE       =   ----    ----
    BIT SIZE         =   ----    ----
    EDATA SIZE       =   ----    ----

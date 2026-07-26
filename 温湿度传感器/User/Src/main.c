@@ -6,6 +6,7 @@
 #include "iic.h"
 #include "aht30.h"
 #include "protocol.h"
+#include "digital_tube.h"
 
 void Delay1ms(void);
 void DelayMs(unsigned int ms);
@@ -16,6 +17,7 @@ void DelayMs(unsigned int ms);
 void main()
 {
     GPIO_Init();    /* 初始化 GPIO */
+    DigitalTube_Init(); /* 初始化三位动态数码管 */
     Uart1_Init();   /* 初始化串口1，9600bps */
     IIC_Init();     /* 初始化软件模拟 I²C */
     DelayMs(100);   /* 等待 AHT30 上电稳定（手册要求 ≥100ms） */
