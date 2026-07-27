@@ -1,129 +1,69 @@
-C51 COMPILER V9.60.7.0   UART1                                                             06/14/2026 02:50:40 PAGE 1   
+C51 COMPILER V9.60.7.0   UART1                                                             07/27/2026 01:13:14 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE UART1
 OBJECT MODULE PLACED IN ..\hex�ļ�\uart1.obj
-COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE ..\App\uart1.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App) DEB
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\App\uart1.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App) DEB
                     -UG OBJECTEXTEND PRINT(.\List\uart1.lst) TABS(2) OBJECT(..\hex�ļ�\uart1.obj)
 
 line level    source
 
    1          #include "uart1.h"
-   2          #include "delay.h"
-   3          u8  TX1_Cnt;    //发送计数
-   4          u8  RX1_Cnt;    //接收计数
-   5          bit B_TX1_Busy; //发送忙标志
-   6          u8 idata RX1_Buffer[UART1_BUF_LENGTH]; //接收缓冲
-   7          
-   8          //========================================================================
-   9          // 函数: void TX1_data()
-  10          // 描述: 串口1发送数据函数
-  11          // 参数: tx1dat: 要发送的数据
-  12          // 返回: none
-  13          // 备注: 
-  14          //========================================================================
-  15          void TX1_data(u8 tx1dat)
-  16          {
-  17   1        SBUF = tx1dat;
-  18   1        B_TX1_Busy = 1;
-  19   1        
-  20   1        while(B_TX1_Busy);
-  21   1      
-  22   1      }
-  23          
-  24          //========================================================================
-  25          // 函数: void PrintString1(u8 *puts)
-  26          // 描述: 串口1发送字符串函数
-  27          // 参数: puts:  字符串指针
-  28          // 返回: none
-  29          // 备注: 
-  30          //========================================================================
-  31          void PrintString1(u8 *puts)
-  32          {
-  33   1        for (; *puts != 0;  puts++)     //到停止符0结束
-  34   1        {
-  35   2          TX1_data(*puts);
-  36   2        }
-  37   1      }
-  38          
-  39          //========================================================================
-  40          // 函数: void UART1_config(u8 UART_IOSEL,u32 FOSC,u32 BAUD1)
-  41          // 描述: UART1初始化函数
-  42          // 参数: FOSC:设置晶振时钟频率，BAUD1:设置波特率
-  43          //       UART_IOSEL=0x00:P3.0/P3.1
-  44          //       UART_IOSEL=0x40:P3.2/P3.3
-  45          //       UART_IOSEL=0x80:P5.4/P5.5
-  46          // 返回: none
-  47          // 备注: 
-  48          //========================================================================
-  49          void UART1_config(u8 UART_IOSEL,u32 FOSC,u32 BAUD1)
-  50          {
-  51   1        TR1 = 0;
-  52   1        AUXR &= ~0x01;      //S1 BRT Use Timer1;
-  53   1        AUXR |=  (1<<6);    //Timer1 set as 1T mode
-  54   1        TMOD &= ~(1<<6);    //Timer1 set As Timer
-C51 COMPILER V9.60.7.0   UART1                                                             06/14/2026 02:50:40 PAGE 2   
-
-  55   1        TMOD &= ~0x30;      //Timer1_16bitAutoReload;
-  56   1        TH1 = (u8)((65536UL - (FOSC / 4) / BAUD1) / 256);
-  57   1        TL1 = (u8)((65536UL - (FOSC / 4) / BAUD1) % 256);
-  58   1        ET1 = 0;    //禁止中断
-  59   1        TR1  = 1;
-  60   1        SCON = (SCON & 0x3f) | 0x40;    //UART1模式, 0x00: 同步移位输出, 0x40: 8位数据,可变波特率
-             -, 0x80: 9位数据,固定波特率, 0xc0: 9位数据,可变波特率
-  61   1          PS  = 1;    //高优先级中断
-  62   1        IPH  |=  0x01 << 4;
-  63   1        ES  = 1;    //允许中断
-  64   1        REN = 1;    //允许接收
-  65   1        P_SW1 |= UART_IOSEL;
-  66   1        //  PCON2 |=  (1<<4);   //内部短路RXD与TXD, 做中继, ENABLE,DISABLE
-  67   1        B_TX1_Busy = 0;
-  68   1        TX1_Cnt = 0;
-  69   1        RX1_Cnt = 0;
-  70   1      }
-  71          
-  72          //========================================================================
-  73          // 函数: void UART1_int (void) interrupt UART1_VECTOR
-  74          // 描述: UART1中断函数
-  75          // 参数: none
-  76          // 返回: none
-  77          // 备注: 
-  78          //========================================================================
-  79          //void UART1_int (void) interrupt 4
-  80          //{
-  81          //    if(RI)
-  82          //    {
-  83          //        RI = 0;
-  84          //        RX1_Buffer[RX1_Cnt] = SBUF;
-  85          //        if(++RX1_Cnt >= UART1_BUF_LENGTH)   RX1_Cnt = 0;
-  86          //    }
-  87          //    if(TI)
-  88          //    {
-  89          //        TI = 0;
-  90          //        B_TX1_Busy = 0;
-  91          //    }
-  92          //}
-  93          
-  94          void UART1_sendArray(unsigned char count, unsigned char *p)
-  95          {
-  96   1        unsigned char i = 0;
-  97   1        for (i = 0; i < count; i++){
-  98   2          
-  99   2          TX1_data(p[i]);
- 100   2        }
- 101   1      }
- 102          
+   2          
+   3          volatile bit B_TX1_Busy;
+   4          
+   5          void TX1_data(u8 tx1dat)
+   6          {
+   7   1          B_TX1_Busy = 1;
+   8   1          SBUF = tx1dat;
+   9   1          while (B_TX1_Busy);
+  10   1      }
+  11          
+  12          void UART1_config(u8 UART_IOSEL, u32 FOSC, u32 BAUD1)
+  13          {
+  14   1          TR1 = 0;
+  15   1          AUXR &= ~0x01;      /* UART1 baud-rate generator: Timer1. */
+  16   1          AUXR |= (1 << 6);   /* Timer1 1T mode. */
+  17   1          TMOD &= ~(1 << 6);  /* Timer mode. */
+  18   1          TMOD &= ~0x30;      /* Timer1 16-bit auto reload. */
+  19   1          TH1 = (u8)((65536UL - (FOSC / 4) / BAUD1) / 256);
+  20   1          TL1 = (u8)((65536UL - (FOSC / 4) / BAUD1) % 256);
+  21   1          ET1 = 0;
+  22   1          TR1 = 1;
+  23   1      
+  24   1          SCON = (SCON & 0x3F) | 0x40; /* UART mode 1, 8N1. */
+  25   1          PS = 1;
+  26   1          IPH |= (0x01 << 4);
+  27   1          ES = 1;
+  28   1          REN = 1;
+  29   1          P_SW1 = (P_SW1 & 0x3F) | UART_IOSEL;
+  30   1      
+  31   1          RI = 0;
+  32   1          TI = 0;
+  33   1          B_TX1_Busy = 0;
+  34   1      }
+  35          
+  36          void UART1_sendArray(unsigned char count, unsigned char *buffer)
+  37          {
+  38   1          unsigned char i;
+  39   1      
+  40   1          for (i = 0; i < count; i++) {
+  41   2              TX1_data(buffer[i]);
+  42   2          }
+  43   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =    241    ----
+   CODE SIZE        =    223    ----
    CONSTANT SIZE    =   ----    ----
-   XDATA SIZE       =      2      12
+   XDATA SIZE       =   ----      12
    PDATA SIZE       =   ----    ----
    DATA SIZE        =   ----    ----
-   IDATA SIZE       =     40    ----
+   IDATA SIZE       =   ----    ----
    BIT SIZE         =      1    ----
 END OF MODULE INFORMATION.
+
+C51 COMPILER V9.60.7.0   UART1                                                             07/27/2026 01:13:14 PAGE 2   
 
 
 C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

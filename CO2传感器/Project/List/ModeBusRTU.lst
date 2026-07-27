@@ -1,412 +1,424 @@
-C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        06/14/2026 02:50:40 PAGE 1   
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/27/2026 01:31:56 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MODEBUSRTU
 OBJECT MODULE PLACED IN ..\hex�ļ�\ModeBusRTU.obj
-COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE ..\App\ModeBusRTU.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\App\ModeBusRTU.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App
                     -) DEBUG OBJECTEXTEND PRINT(.\List\ModeBusRTU.lst) TABS(2) OBJECT(..\hex�ļ�\ModeBusRTU.obj)
 
 line level    source
 
    1          #include "ModeBusRTU.h"
-   2          #include "stdlib.h"
-   3          #include "string.h"
-   4          #include "uart2.h"
-   5          #include "uart1.h"
-   6          #include "digital_cube.h"
-   7          
-   8          typedef struct {
-   9              uint8_t valid;          // 是否校验成功
-  10              uint16_t co2_ppm;    // CO2 浓度值
-  11              uint8_t mode;        // 模式：1=主动输出，2=查询返回
-  12          } CO2_Data;
-  13          CO2_Data co2 = {0};
-  14          // 传感器数据结构体
-  15          typedef struct {
-  16              uint16_t eCO2;
-  17              uint16_t eCH2O;
-  18              uint16_t TVOC;
-  19              uint16_t PM2_5;
-  20              uint16_t PM10;
-  21              uint16_t Temperature;
-  22              uint16_t Humidity;
-  23              uint8_t valid; // 校验是否通过
-  24          } SensorData;
-  25          SensorData sensor = {0};
-  26          double Time = 0;
-  27          unsigned char Res_cnt = 0;
-  28          /*从机地址*/
-  29          uint8_t address;
-  30          /*接收缓存*/
-  31          uint8_t  ModbusReceiveBuf[20];
-  32          uint8_t ModBusSendBuf_len;
-  33          uint8_t sensorRawData[17];
-  34          /*发送缓存*/
-  35          uint8_t ModBusSendBuf[20];
-  36          /*模拟寄存器*/
-  37          uint16_t Reg[6] = {0};
-  38          
-  39          uint8_t uart_send_flag = 0;
-  40          
-  41          uint8_t cnt = 0;
+   2          #include "uart1.h"
+   3          #include "config.h"
+   4          
+   5          #define CO2_MAX_PPM             5000
+   6          
+   7          #define TIMER0_COUNTS_PER_MS    (MAIN_Fosc / 1000UL)
+   8          #define TIMER0_RELOAD_VALUE     (65536UL - TIMER0_COUNTS_PER_MS)
+   9          
+  10          #define CO2_PWM_PERIOD_MIN_MS   954UL
+  11          #define CO2_PWM_PERIOD_MAX_MS   1054UL
+  12          #define CO2_PWM_HIGH_MAX_MS     1004UL
+  13          #define CO2_PWM_TIMEOUT_MS      3000
+  14          
+  15          #define MODBUS_FRAME_LENGTH     8
+  16          #define MODBUS_BUFFER_LENGTH    20
+  17          #define MODBUS_FRAME_GAP_MS     5
+  18          
+  19          #define SENSOR_MODEL_CO2        0x06
+  20          
+  21          typedef struct {
+  22              uint16_t ppm;
+  23              uint8_t valid;
+  24          } CO2_Data;
+  25          
+  26          static volatile CO2_Data co2 = {0, 0};
+  27          
+  28          /* P3.2 PWM parser state, sampled by Timer0 every 1 ms. */
+  29          static volatile u32 pwm_timer0_base = 0;
+  30          static volatile u32 pwm_cycle_start = 0;
+  31          static volatile u32 pwm_high_counts = 0;
+  32          static volatile uint16_t pwm_age_ms = 0;
+  33          static volatile uint8_t pwm_cycle_started = 0;
+  34          static volatile uint8_t pwm_high_captured = 0;
+  35          
+  36          /* UART1 Modbus frame state. */
+  37          static volatile uint8_t ModbusReceiveBuf[MODBUS_BUFFER_LENGTH];
+  38          static volatile uint8_t modbus_rx_length = 0;
+  39          static volatile uint8_t modbus_gap_ms = 0;
+  40          static volatile uint8_t modbus_frame_ready = 0;
+  41          static volatile uint8_t modbus_rx_overflow = 0;
   42          
-  43          
-  44          /*
-  45            co2传感器数据解析校验函数
-  46          */
-  47          static uint8_t calc_sum_check(uint8_t *dd, uint8_t len)
-  48          {
-  49   1          uint16_t sum = 0;
-  50   1        uint8_t i = 0;
-  51   1          for (i = 0; i < len - 1; i++)
-  52   1              sum += dd[i];
-  53   1          return (uint8_t)(sum & 0xFF);
-  54   1      }
-C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        06/14/2026 02:50:40 PAGE 2   
+  43          uint8_t address;
+  44          volatile uint16_t Reg[6] = {0};
+  45          
+  46          void CO2_PWM_Init(void)
+  47          {
+  48   1          /* P3.2 high-impedance input; PWM output level is 3.3 V logic. */
+  49   1          P3M0 &= ~(0x01 << 2);
+  50   1          P3M1 |= (0x01 << 2);
+  51   1          P32 = 1;
+  52   1      
+  53   1          EX0 = 0;
+  54   1          IE0 = 0;
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/27/2026 01:31:56 PAGE 2   
 
-  55          // 校验计算函数（取低8位）7-1
-  56          uint8_t calc_checksum(const uint8_t *dd, int len) {
-  57   1          uint16_t sum = 0;
-  58   1        int i = 0;
-  59   1          for (i = 0; i < len - 1; i++) {  // 不包含最后一位校验和
-  60   2              sum += dd[i];
-  61   2          }
-  62   1          return (uint8_t)(sum & 0xFF); // 取低8位
-  63   1      }
-  64          uint16_t ModBus_CRC(uint8_t *addr,uint8_t num)
-  65          {
-  66   1        
-  67   1        int i, j, temp;
-  68   1        
-  69   1        uint16_t crc=0xFFFF;  
-  70   1        EA = 0;
-  71   1        for(i = 0; i < num; i++) {
-  72   2          crc = crc ^ (*addr);
-  73   2          for( j = 0; j < 8; j++)
-  74   2          {
-  75   3            temp = crc & 0x0001;
-  76   3            crc = crc>>1;
-  77   3            if(temp) {
-  78   4              crc = crc ^ 0xA001;
-  79   4            }
-  80   3          }
-  81   2          addr++;
-  82   2        }
-  83   1        EA = 1;
-  84   1        return crc;
-  85   1      }
-  86          
-  87          /*
-  88            7合1传感器发送
-  89          */
-  90          // void ModBus_Send(void)
-  91          // {
-  92          //     uint8_t i = 0;
-  93          //     uint16_t crc = 0;
-  94          
-  95          //     uint8_t addr = ModbusReceiveBuf[0];   // 从请求帧获取设备地址
-  96          //     uint8_t func = 0x03;                  // 功能码：读保持寄存器
-  97          //    // 温度和湿度：转为整数后发送（×10保留一位小数）
-  98          //     uint16_t temp_send = (uint16_t)(sensor.Temperature * 10);
-  99          //     uint16_t humi_send = (uint16_t)(sensor.Humidity * 10);
- 100          //     // 写入地址和功能码
- 101          //     ModBusSendBuf[i++] = addr;
- 102          //     ModBusSendBuf[i++] = func;
- 103          
- 104          //     // 数据字节数：每项2字节，共7项（eCO2、eCH2O、TVOC、PM2.5、PM10、温度、湿度
-             -）
- 105          //     ModBusSendBuf[i++] = 14;
- 106          
- 107          //     // ==== 依次写入各项传感器数据 ====
- 108          //     ModBusSendBuf[i++] = (uint8_t)(sensor.eCO2 >> 8);
- 109          //     ModBusSendBuf[i++] = (uint8_t)(sensor.eCO2 & 0xFF);
- 110          
- 111          //     ModBusSendBuf[i++] = (uint8_t)(sensor.eCH2O >> 8);
- 112          //     ModBusSendBuf[i++] = (uint8_t)(sensor.eCH2O & 0xFF);
- 113          
- 114          //     ModBusSendBuf[i++] = (uint8_t)(sensor.TVOC >> 8);
- 115          //     ModBusSendBuf[i++] = (uint8_t)(sensor.TVOC & 0xFF);
-C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        06/14/2026 02:50:40 PAGE 3   
+  55   1      
+  56   1          pwm_timer0_base = 0;
+  57   1          pwm_cycle_start = 0;
+  58   1          pwm_high_counts = 0;
+  59   1          pwm_age_ms = 0;
+  60   1          pwm_cycle_started = 0;
+  61   1          pwm_high_captured = 0;
+  62   1          co2.ppm = 0;
+  63   1          co2.valid = 0;
+  64   1      
+  65   1          /*
+  66   1           * STC8H INT0:
+  67   1           *   IT0 = 0: both rising and falling edges generate an interrupt.
+  68   1           *   The ISR reads P3.2 to distinguish the edge polarity.
+  69   1          */
+  70   1          IT0 = 0;
+  71   1          PX0 = 0;
+  72   1          IPH &= ~0x01;
+  73   1          EX0 = 1;
+  74   1      }
+  75          
+  76          void CO2_PWM_Timer0Overflow(void)
+  77          {
+  78   1          pwm_timer0_base += TIMER0_COUNTS_PER_MS;
+  79   1      }
+  80          
+  81          void CO2_PWM_Tick1ms(void)
+  82          {
+  83   1          if (pwm_age_ms < CO2_PWM_TIMEOUT_MS) {
+  84   2              pwm_age_ms++;
+  85   2              if (pwm_age_ms >= CO2_PWM_TIMEOUT_MS) {
+  86   3                  co2.valid = 0;
+  87   3                  pwm_cycle_started = 0;
+  88   3                  pwm_high_captured = 0;
+  89   3              }
+  90   2          }
+  91   1      }
+  92          
+  93          static uint16_t CO2_PWM_ReadTimer0(void)
+  94          {
+  95   1          uint8_t high_first;
+  96   1          uint8_t low;
+  97   1          uint8_t high_second;
+  98   1      
+  99   1          do {
+ 100   2              high_first = TH0;
+ 101   2              low = TL0;
+ 102   2              high_second = TH0;
+ 103   2          } while (high_first != high_second);
+ 104   1      
+ 105   1          return ((uint16_t)high_first << 8) | low;
+ 106   1      }
+ 107          
+ 108          static u32 CO2_PWM_ReadTimestamp(void)
+ 109          {
+ 110   1          u32 base;
+ 111   1          uint16_t timer_value;
+ 112   1      
+ 113   1          base = pwm_timer0_base;
+ 114   1          timer_value = CO2_PWM_ReadTimer0();
+ 115   1      
+ 116   1          /*
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/27/2026 01:31:56 PAGE 3   
 
- 116          
- 117          //     ModBusSendBuf[i++] = (uint8_t)(sensor.PM2_5 >> 8);
- 118          //     ModBusSendBuf[i++] = (uint8_t)(sensor.PM2_5 & 0xFF);
- 119          
- 120          //     ModBusSendBuf[i++] = (uint8_t)(sensor.PM10 >> 8);
- 121          //     ModBusSendBuf[i++] = (uint8_t)(sensor.PM10 & 0xFF);
- 122          
- 123              
- 124          
- 125          //     ModBusSendBuf[i++] = (uint8_t)(temp_send >> 8);
- 126          //     ModBusSendBuf[i++] = (uint8_t)(temp_send & 0xFF);
- 127          
- 128          //     ModBusSendBuf[i++] = (uint8_t)(humi_send >> 8);
- 129          //     ModBusSendBuf[i++] = (uint8_t)(humi_send & 0xFF);
- 130          
- 131          //     // ==== CRC校验 ====
- 132          //     crc = ModBus_CRC(ModBusSendBuf, i);
- 133          //     ModBusSendBuf[i++] = crc & 0xFF;   // CRC低字节
- 134          //     ModBusSendBuf[i++] = crc >> 8;     // CRC高字节
- 135          
- 136          //     ModBusSendBuf_len = i;
- 137          //     uart_send_flag = 1; // 通知主程序可以发送
- 138          // }
- 139          /*
- 140            co2传感器数据发送函数
- 141          */
- 142          void ModBus_Send(void)
- 143          {
- 144   1          uint8_t i = 0;
- 145   1          uint16_t crc = 0;
- 146   1      
- 147   1          uint8_t addr = ModbusReceiveBuf[0];   // 从请求帧获取设备地址
- 148   1          uint8_t func = 0x03;                  // 功能码：读保持寄存器
- 149   1      
- 150   1          // ==== 1. 写入地址和功能码 ====
- 151   1          ModBusSendBuf[i++] = addr;
- 152   1          ModBusSendBuf[i++] = func;
- 153   1      
- 154   1          // ==== 2. 数据字节数 ====
- 155   1          // 1字节型号 + 2字节CO2数据
- 156   1          ModBusSendBuf[i++] = 3;
- 157   1      
- 158   1          // ==== 3. 型号字节 0x06（CO2 传感器） ====
- 159   1          ModBusSendBuf[i++] = 0x06;
+ 117   1           * INT0 and Timer0 use the same priority and cannot preempt each other.
+ 118   1           * If Timer0 overflowed but its ISR has not run yet, include that pending
+ 119   1           * millisecond and reread the timer.
+ 120   1           */
+ 121   1          if (TF0) {
+ 122   2              base += TIMER0_COUNTS_PER_MS;
+ 123   2              timer_value = CO2_PWM_ReadTimer0();
+ 124   2          }
+ 125   1      
+ 126   1          return base + (uint16_t)(timer_value - TIMER0_RELOAD_VALUE);
+ 127   1      }
+ 128          
+ 129          static uint16_t CO2_PWM_CountsToPPM(u32 high_counts)
+ 130          {
+ 131   1          u32 ppm;
+ 132   1      
+ 133   1          if (high_counts <= 2UL * TIMER0_COUNTS_PER_MS) {
+ 134   2              ppm = 0;
+ 135   2          } else {
+ 136   2              high_counts -= 2UL * TIMER0_COUNTS_PER_MS;
+ 137   2              ppm = (high_counts * 5UL + TIMER0_COUNTS_PER_MS / 2UL) /
+ 138   2                    TIMER0_COUNTS_PER_MS;
+ 139   2          }
+ 140   1      
+ 141   1          if (ppm > CO2_MAX_PPM) {
+ 142   2              ppm = CO2_MAX_PPM;
+ 143   2          }
+ 144   1      
+ 145   1          return (uint16_t)ppm;
+ 146   1      }
+ 147          
+ 148          uint8_t CO2_GetLatest(uint16_t *ppm)
+ 149          {
+ 150   1          bit saved_ea;
+ 151   1          uint8_t valid;
+ 152   1      
+ 153   1          saved_ea = EA;
+ 154   1          EA = 0;
+ 155   1          valid = co2.valid;
+ 156   1          if (valid) {
+ 157   2              *ppm = co2.ppm;
+ 158   2          }
+ 159   1          EA = saved_ea;
  160   1      
- 161   1          // ==== 4. 写入 CO2 数据 ====
- 162   1          ModBusSendBuf[i++] = (uint8_t)(co2.co2_ppm >> 8);   // 高字节
- 163   1          ModBusSendBuf[i++] = (uint8_t)(co2.co2_ppm & 0xFF); // 低字节
- 164   1      
- 165   1          // ==== 5. CRC16 校验 ====
- 166   1          crc = ModBus_CRC(ModBusSendBuf, i);
- 167   1          ModBusSendBuf[i++] = crc & 0xFF;   // CRC低字节
- 168   1          ModBusSendBuf[i++] = crc >> 8;     // CRC高字节
- 169   1      
- 170   1          // ==== 6. 更新发送标志 ====
- 171   1          ModBusSendBuf_len = i;
- 172   1          uart_send_flag = 1;  // 通知主循环可以发送
- 173   1      }
- 174          
- 175          void ModBus_write(void)
- 176          {
- 177   1        uint16_t Reg_address = (uint16_t)((ModbusReceiveBuf[2] << 8) | ModbusReceiveBuf[3]);
-C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        06/14/2026 02:50:40 PAGE 4   
+ 161   1          return valid;
+ 162   1      }
+ 163          
+ 164          uint8_t CO2_PWM_IsTimedOut(void)
+ 165          {
+ 166   1          bit saved_ea;
+ 167   1          uint8_t timed_out;
+ 168   1      
+ 169   1          saved_ea = EA;
+ 170   1          EA = 0;
+ 171   1          timed_out = (pwm_age_ms >= CO2_PWM_TIMEOUT_MS);
+ 172   1          EA = saved_ea;
+ 173   1      
+ 174   1          return timed_out;
+ 175   1      }
+ 176          
+ 177          void INT0_PWM_ISR(void) interrupt INT0_VECTOR
+ 178          {
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/27/2026 01:31:56 PAGE 4   
 
- 178   1        uint16_t receive_data = (uint16_t)((ModbusReceiveBuf[4] << 8) | ModbusReceiveBuf[5]);
- 179   1        if (Reg_address < 6)  /* Reg 只有 6 个元素 */
- 180   1          Reg[Reg_address] = receive_data;
- 181   1      }
- 182          
- 183          
- 184          
- 185          uint8_t RxState = 0;        // 接收状态
- 186          uint8_t pRxPacket = 0;      // 当前接收到的位置
- 187          void ModBus_Clear(void)
- 188          {
- 189   1        RxState = 0;
- 190   1        pRxPacket = 0;
- 191   1        memset(ModbusReceiveBuf, 0, sizeof(ModbusReceiveBuf)); 
- 192   1      }
- 193          unsigned int parse_co2_frame()
- 194          {
- 195   1          co2.valid = 0;
- 196   1          // -------------------------
- 197   1          // 主动输出帧 (16 bytes)
- 198   1          // -------------------------
- 199   1          if (pRxPacket == 16 && sensorRawData[0] == 0x42 && sensorRawData[1] == 0x4D)
- 200   1          {
- 201   2            
- 202   2              uint8_t sum = calc_sum_check(sensorRawData, 16);
- 203   2            
- 204   2              if (sum == sensorRawData[15])
- 205   2              {
- 206   3                  pRxPacket = 0;
- 207   3                  co2.co2_ppm = (sensorRawData[6] << 8) | sensorRawData[7];
- 208   3                  co2.valid = 1;
- 209   3                  co2.mode = 1;  // 主动输出模式
- 210   3                  return co2.co2_ppm;
- 211   3              }
- 212   2              else
- 213   2              {
- 214   3                pRxPacket = 0;
- 215   3              }
- 216   2          }
- 217   1          
- 218   1          // -------------------------
- 219   1          // 查询返回帧 (14 bytes)
- 220   1          // -------------------------
- 221   1          else if (pRxPacket == 14 && sensorRawData[0] == 0x64 && sensorRawData[1] == 0x69)
- 222   1          {
- 223   2            
- 224   2              // 提取CRC
- 225   2              uint16_t crc_calc = calc_sum_check(sensorRawData, 12);
- 226   2              uint16_t crc_recv = (sensorRawData[13] << 8) | sensorRawData[12];
- 227   2      //P34 = 0;
- 228   2              if (crc_calc == crc_recv)
- 229   2              {
- 230   3                  pRxPacket = 0;
- 231   3                  co2.co2_ppm = (sensorRawData[5] << 8) | sensorRawData[4];
- 232   3                  co2.valid = 1;
- 233   3                  co2.mode = 2;  // 查询返回模式
- 234   3                  return co2.co2_ppm;
- 235   3              }
- 236   2              else
- 237   2              {
- 238   3                  pRxPacket = 0;
- 239   3              }
-C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        06/14/2026 02:50:40 PAGE 5   
+ 179   1          u32 now;
+ 180   1          u32 period_counts;
+ 181   1          u32 high_counts;
+ 182   1      
+ 183   1          now = CO2_PWM_ReadTimestamp();
+ 184   1      
+ 185   1          if (P32) {
+ 186   2              /* Rising edge: finish the previous cycle, then start a new one. */
+ 187   2              if (pwm_cycle_started && pwm_high_captured) {
+ 188   3                  period_counts = now - pwm_cycle_start;
+ 189   3                  high_counts = pwm_high_counts;
+ 190   3      
+ 191   3                  if (period_counts >=
+ 192   3                          CO2_PWM_PERIOD_MIN_MS * TIMER0_COUNTS_PER_MS &&
+ 193   3                      period_counts <=
+ 194   3                          CO2_PWM_PERIOD_MAX_MS * TIMER0_COUNTS_PER_MS &&
+ 195   3                      high_counts <=
+ 196   3                          CO2_PWM_HIGH_MAX_MS * TIMER0_COUNTS_PER_MS) {
+ 197   4                      co2.ppm = CO2_PWM_CountsToPPM(high_counts);
+ 198   4                      co2.valid = 1;
+ 199   4                      pwm_age_ms = 0;
+ 200   4                  }
+ 201   3              }
+ 202   2      
+ 203   2              pwm_cycle_start = now;
+ 204   2              pwm_high_counts = 0;
+ 205   2              pwm_cycle_started = 1;
+ 206   2              pwm_high_captured = 0;
+ 207   2          } else {
+ 208   2              /* Falling edge: latch TH for the cycle that started at rising edge. */
+ 209   2              if (pwm_cycle_started && !pwm_high_captured) {
+ 210   3                  high_counts = now - pwm_cycle_start;
+ 211   3                  if (high_counts <=
+ 212   3                          CO2_PWM_HIGH_MAX_MS * TIMER0_COUNTS_PER_MS) {
+ 213   4                      pwm_high_counts = high_counts;
+ 214   4                      pwm_high_captured = 1;
+ 215   4                  } else {
+ 216   4                      pwm_cycle_started = 0;
+ 217   4                  }
+ 218   3              }
+ 219   2          }
+ 220   1      }
+ 221          
+ 222          uint16_t ModBus_CRC(volatile uint8_t *buffer, uint8_t length)
+ 223          {
+ 224   1          uint8_t i;
+ 225   1          uint8_t bit_index;
+ 226   1          uint16_t crc = 0xFFFF;
+ 227   1      
+ 228   1          for (i = 0; i < length; i++) {
+ 229   2              crc ^= buffer[i];
+ 230   2              for (bit_index = 0; bit_index < 8; bit_index++) {
+ 231   3                  if (crc & 0x0001) {
+ 232   4                      crc = (crc >> 1) ^ 0xA001;
+ 233   4                  } else {
+ 234   4                      crc >>= 1;
+ 235   4                  }
+ 236   3              }
+ 237   2          }
+ 238   1      
+ 239   1          return crc;
+ 240   1      }
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/27/2026 01:31:56 PAGE 5   
 
- 240   2          }
- 241   1          else
- 242   1          {
- 243   2            P34=1;
- 244   2          }
- 245   1      
- 246   1      }
- 247          // 放到某个串口中断里
- 248          void parse_sensor_frame() {
- 249   1      // 温度部分
- 250   1          uint8_t temp_high = sensorRawData[12];
- 251   1          uint8_t temp_low  = sensorRawData[13];
- 252   1        uint8_t checksum = calc_checksum(sensorRawData, sizeof(sensorRawData));
- 253   1        float temp = (float)temp_high + (temp_low / 10.0f);
- 254   1          if (sizeof(sensorRawData) < 17 || sensorRawData[0] != 0x3C || sensorRawData[1] != 0x02) {
- 255   2              sensor.valid = 0;
- 256   2              return;
- 257   2          }
- 258   1      
- 259   1          if (checksum != sensorRawData[16]) {
- 260   2              sensor.valid = 0;
- 261   2              return;
- 262   2          }
- 263   1      
- 264   1          sensor.valid = 1;
- 265   1      
- 266   1          // 解析各项数据（高字节在前）
- 267   1          sensor.eCO2  = (sensorRawData[2] << 8) | sensorRawData[3];
- 268   1          sensor.eCH2O = (sensorRawData[4] << 8) | sensorRawData[5];
- 269   1          sensor.TVOC  = (sensorRawData[6] << 8) | sensorRawData[7];
- 270   1          sensor.PM2_5 = (sensorRawData[8] << 8) | sensorRawData[9];
- 271   1          sensor.PM10  = (sensorRawData[10] << 8) | sensorRawData[11];
- 272   1      
- 273   1          
- 274   1          
- 275   1          if (temp_high & 0x80) { // bit7=1 表示负温度
- 276   2              temp_high &= 0x7F;
- 277   2              temp = -((float)temp_high + (temp_low / 10.0f));
- 278   2          }
- 279   1          sensor.Temperature = temp;
- 280   1      
- 281   1          // 湿度部分
- 282   1          sensor.Humidity = sensorRawData[14] + (sensorRawData[15] / 10.0f);
+ 241          
+ 242          void ModBus_ReceiveByte(uint8_t data_byte)
+ 243          {
+ 244   1          if (modbus_frame_ready) {
+ 245   2              return;
+ 246   2          }
+ 247   1      
+ 248   1          if (modbus_rx_length < MODBUS_BUFFER_LENGTH) {
+ 249   2              ModbusReceiveBuf[modbus_rx_length++] = data_byte;
+ 250   2          } else {
+ 251   2              modbus_rx_overflow = 1;
+ 252   2          }
+ 253   1      
+ 254   1          modbus_gap_ms = 0;
+ 255   1      }
+ 256          
+ 257          void ModBus_Tick1ms(void)
+ 258          {
+ 259   1          if (modbus_rx_length == 0 || modbus_frame_ready) {
+ 260   2              return;
+ 261   2          }
+ 262   1      
+ 263   1          if (modbus_gap_ms < MODBUS_FRAME_GAP_MS) {
+ 264   2              modbus_gap_ms++;
+ 265   2          }
+ 266   1      
+ 267   1          if (modbus_gap_ms >= MODBUS_FRAME_GAP_MS) {
+ 268   2              modbus_frame_ready = 1;
+ 269   2          }
+ 270   1      }
+ 271          
+ 272          static void ModBus_ResetReceive(void)
+ 273          {
+ 274   1          bit saved_ea;
+ 275   1      
+ 276   1          saved_ea = EA;
+ 277   1          EA = 0;
+ 278   1          modbus_rx_length = 0;
+ 279   1          modbus_gap_ms = 0;
+ 280   1          modbus_frame_ready = 0;
+ 281   1          modbus_rx_overflow = 0;
+ 282   1          EA = saved_ea;
  283   1      }
  284          
- 285          /*
- 286            1ms处理串口接收到的消息
- 287            modbus相关变量在此文件内作为全局变量，调用方便
- 288          */
- 289          void ModBus_ReadOneByte()
- 290          {
- 291   1        uint8_t CRC_H = 0, CRC_L = 0;
- 292   1        if ((ModbusReceiveBuf[0] == address || ModbusReceiveBuf[0] == 0xff) &&  Res_cnt >= 7) {
- 293   2        //if (((ModbusReceiveBuf[0] >= 0x00 && ModbusReceiveBuf[0] <= 0x3f) || (ModbusReceiveBuf[0] == 0xff)) && 
-             - Res_cnt >= 7) {  
- 294   2          if (ModBus_CRC(ModbusReceiveBuf, 6) == (ModbusReceiveBuf[7] << 8 | ModbusReceiveBuf[6])) {
- 295   3            ModBus_handle();
- 296   3            Res_cnt = 0;
- 297   3          }
- 298   2        }
- 299   1        Res_cnt = 0;
- 300   1      }
-C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        06/14/2026 02:50:40 PAGE 6   
+ 285          static void ModBus_WriteRegister(uint16_t register_address,
+ 286                                           uint16_t register_value)
+ 287          {
+ 288   1          bit saved_ea;
+ 289   1      
+ 290   1          saved_ea = EA;
+ 291   1          EA = 0;
+ 292   1          Reg[register_address] = register_value;
+ 293   1          EA = saved_ea;
+ 294   1      }
+ 295          
+ 296          static void ModBus_SendCO2(uint8_t slave_address, uint16_t ppm)
+ 297          {
+ 298   1          uint8_t send_buffer[8];
+ 299   1          uint16_t crc;
+ 300   1      
+ 301   1          send_buffer[0] = slave_address;
+ 302   1          send_buffer[1] = 0x03;
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/27/2026 01:31:56 PAGE 6   
 
- 301          
- 302          void ModBus_handle()
- 303          {
- 304   1      
- 305   1        switch (ModbusReceiveBuf[1])
- 306   1        {
- 307   2        case 0x03:
- 308   2          if (ModbusReceiveBuf[0] != 0xFF)
- 309   2            
- 310   2            ModBus_Send();
- 311   2          break;
- 312   2        case 0x06:
- 313   2          
- 314   2          ModBus_write();
- 315   2          break;
- 316   2        
- 317   2        default:
- 318   2          break;
- 319   2        }
- 320   1      
- 321   1      
- 322   1      }
- 323          /*
- 324            实际使用中串口1，2只使用到一个，串口中断接受信息，填充到接收缓存/
- 325            
- 326          */
- 327          void UART2_int (void) interrupt UART2_VECTOR
- 328          {
- 329   1        unsigned char temp; 
- 330   1      
- 331   1        Digital_Tube_flash();
- 332   1          if((S2CON & 1) != 0)
- 333   1          {
- 334   2              S2CON &= ~1;    //Clear Rx flag
- 335   2              temp =  S2BUF;
- 336   2          //TX1_data(temp);
- 337   2      //    ModBus_ReadOneByte(temp);
- 338   2      
- 339   2          // ModbusReceiveBuf[Res_cnt++] = temp;//注释掉一个
- 340   2          if (pRxPacket < sizeof(sensorRawData))
- 341   2                  sensorRawData[pRxPacket++] = temp;
- 342   2              else
- 343   2                  pRxPacket = 0;   // 防止溢出
- 344   2          
- 345   2          cnt = 0;
+ 303   1          send_buffer[2] = 0x03;
+ 304   1          send_buffer[3] = SENSOR_MODEL_CO2;
+ 305   1          send_buffer[4] = (uint8_t)(ppm >> 8);
+ 306   1          send_buffer[5] = (uint8_t)ppm;
+ 307   1      
+ 308   1          crc = ModBus_CRC(send_buffer, 6);
+ 309   1          send_buffer[6] = (uint8_t)crc;
+ 310   1          send_buffer[7] = (uint8_t)(crc >> 8);
+ 311   1      
+ 312   1          UART1_sendArray(sizeof(send_buffer), send_buffer);
+ 313   1      }
+ 314          
+ 315          void ModBus_Process(void)
+ 316          {
+ 317   1          uint16_t crc_received;
+ 318   1          uint16_t register_address;
+ 319   1          uint16_t register_value;
+ 320   1          uint16_t ppm;
+ 321   1          uint8_t request_address;
+ 322   1          uint8_t function_code;
+ 323   1          uint8_t send_response = 0;
+ 324   1      
+ 325   1          if (!modbus_frame_ready) {
+ 326   2              return;
+ 327   2          }
+ 328   1      
+ 329   1          if (modbus_rx_overflow ||
+ 330   1              modbus_rx_length != MODBUS_FRAME_LENGTH) {
+ 331   2              ModBus_ResetReceive();
+ 332   2              return;
+ 333   2          }
+ 334   1      
+ 335   1          crc_received = (uint16_t)ModbusReceiveBuf[6] |
+ 336   1                         ((uint16_t)ModbusReceiveBuf[7] << 8);
+ 337   1          if (ModBus_CRC(ModbusReceiveBuf, 6) != crc_received) {
+ 338   2              ModBus_ResetReceive();
+ 339   2              return;
+ 340   2          }
+ 341   1      
+ 342   1          request_address = ModbusReceiveBuf[0];
+ 343   1          if (request_address != address && request_address != 0xFF) {
+ 344   2              ModBus_ResetReceive();
+ 345   2              return;
  346   2          }
- 347   1          if((S2CON & 2) != 0)
- 348   1          {
- 349   2              S2CON &= ~2;    //Clear Tx flag
- 350   2          B_TX2_Busy = 0;
- 351   2          }
- 352   1      }
- 353          
- 354          void UART1_int (void) interrupt 4
- 355          {
- 356   1        Digital_Tube_flash();
- 357   1          if(RI)
- 358   1          {
- 359   2              RI = 0;
- 360   2      //    temp = SBUF;
- 361   2          //ModBus_ReadOneByte(temp);
- 362   2          ModbusReceiveBuf[Res_cnt++] = SBUF;//注释掉一个
-C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        06/14/2026 02:50:40 PAGE 7   
+ 347   1      
+ 348   1          function_code = ModbusReceiveBuf[1];
+ 349   1          register_address = ((uint16_t)ModbusReceiveBuf[2] << 8) |
+ 350   1                             ModbusReceiveBuf[3];
+ 351   1          register_value = ((uint16_t)ModbusReceiveBuf[4] << 8) |
+ 352   1                           ModbusReceiveBuf[5];
+ 353   1      
+ 354   1          if (function_code == 0x03) {
+ 355   2              if (request_address != 0xFF &&
+ 356   2                  (register_address == 0x0000 || register_address == 0x0001) &&
+ 357   2                  register_value == 0x0001 &&
+ 358   2                  CO2_GetLatest(&ppm)) {
+ 359   3                  send_response = 1;
+ 360   3              }
+ 361   2          } else if (function_code == 0x06) {
+ 362   2              if (register_address < 6) {
+ 363   3                  ModBus_WriteRegister(register_address, register_value);
+ 364   3              }
+C51 COMPILER V9.60.7.0   MODEBUSRTU                                                        07/27/2026 01:31:56 PAGE 7   
 
- 363   2          // P34=0;  // 调试代码已移除
- 364   2          // sensorRawData[pRxPacket++] = SBUF;
- 365   2          cnt = 0;
- 366   2              
- 367   2          }
- 368   1          if(TI)
- 369   1          {
- 370   2              TI = 0;
- 371   2              B_TX1_Busy = 0;
- 372   2          }
- 373   1      }
-*** WARNING C291 IN LINE 246 OF ..\App\ModeBusRTU.c: not every exit path returns a value
+ 365   2          }
+ 366   1      
+ 367   1          ModBus_ResetReceive();
+ 368   1      
+ 369   1          if (send_response) {
+ 370   2              ModBus_SendCO2(request_address, ppm);
+ 371   2          }
+ 372   1      }
+ 373          
+ 374          void UART1_int(void) interrupt UART1_VECTOR
+ 375          {
+ 376   1          uint8_t data_byte;
+ 377   1      
+ 378   1          if (RI) {
+ 379   2              RI = 0;
+ 380   2              data_byte = SBUF;
+ 381   2              ModBus_ReceiveByte(data_byte);
+ 382   2          }
+ 383   1      
+ 384   1          if (TI) {
+ 385   2              TI = 0;
+ 386   2              B_TX1_Busy = 0;
+ 387   2          }
+ 388   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   1489    ----
+   CODE SIZE        =   1589    ----
    CONSTANT SIZE    =   ----    ----
-   XDATA SIZE       =     99      33
+   XDATA SIZE       =     56      50
    PDATA SIZE       =   ----    ----
    DATA SIZE        =   ----    ----
    IDATA SIZE       =   ----    ----
-   BIT SIZE         =   ----    ----
+   BIT SIZE         =   ----       4
 END OF MODULE INFORMATION.
 
 
-C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

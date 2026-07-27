@@ -15,7 +15,7 @@
         <TargetCommonOption>
           <Device>AT89C51</Device>
           <Vendor>Microchip</Vendor>
-          <Cpu>IRAM(0-0x7F) IROM(0-0xFFF) CLOCK(24000000)</Cpu>
+          <Cpu>IRAM(0-0x7F) IROM(0-0xFFF) CLOCK(11059200)</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
           <StartupFile>"LIB\STARTUP.A51" ("Standard 8051 Startup Code")</StartupFile>
           <FlashDriverDll></FlashDriverDll>
@@ -387,11 +387,6 @@
           <GroupName>App</GroupName>
           <Files>
             <File>
-              <FileName>RI2C.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\App\RI2C.c</FilePath>
-            </File>
-            <File>
               <FileName>delay.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\App\delay.c</FilePath>
@@ -402,16 +397,6 @@
               <FilePath>..\App\uart1.c</FilePath>
             </File>
             <File>
-              <FileName>adc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\App\adc.c</FilePath>
-            </File>
-            <File>
-              <FileName>timer2.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\App\timer2.c</FilePath>
-            </File>
-            <File>
               <FileName>digital_cube.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\App\digital_cube.c</FilePath>
@@ -420,11 +405,6 @@
               <FileName>addr.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\App\addr.c</FilePath>
-            </File>
-            <File>
-              <FileName>uart2.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\App\uart2.c</FilePath>
             </File>
             <File>
               <FileName>ModeBusRTU.c</FileName>

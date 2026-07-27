@@ -1,9 +1,6 @@
 #include "timer0.h"
 #include "config.h"
 
-//
-u16 T0_cnt;
-
 /*********************************************
 /*函数名称：Timer0_Config(u8 mode, u16 time)
 /*函数功能：Timer0配置函数
@@ -33,11 +30,12 @@ void Timer0_Config(u8 mode, u16 time)
 		}
 	}
 	TMOD &= 0xF0;		//设置定时器为模式0,16位自动重装载
+	TF0 = 0;				//清除可能残留的溢出标志
 	TR0 = 1;				//启动定时器
 	ET0 = 1;				//打开定时器中断
 	PX0 = 0;
-	IP &= ~(0x01) << 1;
-	IPH &= ~(0x01) << 1;
+	IP &= ~(0x01 << 1);
+	IPH &= ~(0x01 << 1);
 }
 
 ////Timer0 Interrupt Routine

@@ -3,26 +3,23 @@
 
 #include "STC8H.h"
 
-#define uint8_t unsigned char
+#define uint8_t  unsigned char
 #define uint16_t unsigned int
 
-
-extern uint8_t ModbusReceiveBuf[20];
-extern uint8_t ModBusSendBuf[20];
-extern uint8_t ModBusSendBuf_len;
-extern uint8_t uart_send_flag;
 extern uint8_t address;
-extern uint16_t Reg[6];
-extern volatile double Time;
-extern uint8_t cnt;
+extern volatile uint16_t Reg[6];
 
-uint16_t ModBus_CRC(uint8_t *addr,uint8_t num);
-void ModBus_Send(void);
-void ModBus_ReadOneByte();
-void ModBus_handle(void);
-void ModBus_Clear(void);
-unsigned int parse_co2_frame();
+/* CO2 module: P3.2 PWM measurement. */
+void CO2_PWM_Init(void);
+void CO2_PWM_Timer0Overflow(void);
+void CO2_PWM_Tick1ms(void);
+uint8_t CO2_GetLatest(uint16_t *ppm);
+uint8_t CO2_PWM_IsTimedOut(void);
 
-extern unsigned char Res_cnt;
+/* Controller: UART1 Modbus RTU slave protocol. */
+void ModBus_ReceiveByte(uint8_t data_byte);
+void ModBus_Tick1ms(void);
+void ModBus_Process(void);
+uint16_t ModBus_CRC(volatile uint8_t *buffer, uint8_t length);
 
 #endif

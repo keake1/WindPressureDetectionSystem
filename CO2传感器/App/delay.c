@@ -1,6 +1,6 @@
 #include "delay.h"
 
-#if (SYS_FOSC == FOSC_11059200)
+#if (MAIN_Fosc == 11059200L)
 /*********************************************
 /*函数名称：Delay_ms(void)
 /*函数功能：11.0592MHz工作频率下延时约1ms
@@ -36,7 +36,7 @@ void Delay_us()		//@11.0592MHz
 }
 
 
-#elif (SYS_FOSC == FOSC_22118400)
+#elif (MAIN_Fosc == 22118400L)
 /*********************************************
 /*函数名称：Delay_us(void)
 /*函数功能：22.1184MHz工作频率下的延时1us
@@ -70,7 +70,7 @@ void Delay_ms()		//@22.1184MHz
 	} while (--i);
 }
 
-#elif (SYS_FOSC == FOSC_24000000)
+#elif (MAIN_Fosc == 24000000L)
 /*********************************************
 /*函数名称：Delay_us(void)
 /*函数功能：24MHz工作频率下的延时1us

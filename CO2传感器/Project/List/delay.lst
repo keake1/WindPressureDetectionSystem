@@ -1,16 +1,16 @@
-C51 COMPILER V9.60.7.0   DELAY                                                             06/14/2026 02:50:39 PAGE 1   
+C51 COMPILER V9.60.7.0   DELAY                                                             07/27/2026 01:13:14 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE DELAY
 OBJECT MODULE PLACED IN ..\hex�ļ�\delay.obj
-COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE ..\App\delay.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App) DEB
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\App\delay.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App) DEB
                     -UG OBJECTEXTEND PRINT(.\List\delay.lst) TABS(2) OBJECT(..\hex�ļ�\delay.obj)
 
 line level    source
 
    1          #include "delay.h"
    2          
-   3          #if (SYS_FOSC == FOSC_11059200)
+   3          #if (MAIN_Fosc == 11059200L)
    4          /*********************************************
    5          /*函数名称：Delay_ms(void)
    6          /*函数功能：11.0592MHz工作频率下延时约1ms
@@ -46,7 +46,7 @@ line level    source
   36   1      }
   37          
   38          
-  39          #elif (SYS_FOSC == FOSC_22118400)
+  39          #elif (MAIN_Fosc == 22118400L)
               /*********************************************
               /*函数名称：Delay_us(void)
               /*函数功能：22.1184MHz工作频率下的延时1us
@@ -62,7 +62,7 @@ line level    source
                 while (--i);
               }
               
-C51 COMPILER V9.60.7.0   DELAY                                                             06/14/2026 02:50:39 PAGE 2   
+C51 COMPILER V9.60.7.0   DELAY                                                             07/27/2026 01:13:14 PAGE 2   
 
               /*********************************************
               /*函数名称：Delay_ms(void)
@@ -82,7 +82,7 @@ line level    source
                 } while (--i);
               }
               
-              #elif (SYS_FOSC == FOSC_24000000)
+              #elif (MAIN_Fosc == 24000000L)
               /*********************************************
               /*函数名称：Delay_us(void)
               /*函数功能：24MHz工作频率下的延时1us
@@ -126,7 +126,7 @@ line level    source
  114          void Delay_xms(u16 i)
  115          {
  116   1        u16 k;  
-C51 COMPILER V9.60.7.0   DELAY                                                             06/14/2026 02:50:39 PAGE 3   
+C51 COMPILER V9.60.7.0   DELAY                                                             07/27/2026 01:13:14 PAGE 3   
 
  117   1        for(k=0;k<i;k++)
  118   1        {

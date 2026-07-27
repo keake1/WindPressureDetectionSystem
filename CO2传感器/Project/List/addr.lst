@@ -1,44 +1,48 @@
-C51 COMPILER V9.60.7.0   ADDR                                                              06/14/2026 02:50:40 PAGE 1   
+C51 COMPILER V9.60.7.0   ADDR                                                              07/27/2026 01:13:14 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE ADDR
 OBJECT MODULE PLACED IN ..\hex文件\addr.obj
-COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE ..\App\addr.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App) DEBU
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\App\addr.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\User;..\App) DEBU
                     -G OBJECTEXTEND PRINT(.\List\addr.lst) TABS(2) OBJECT(..\hex文件\addr.obj)
 
 line level    source
 
    1          #include "addr.h"
-   2          void addr_init(void)
-   3          {
-   4   1          //上拉
-   5   1          //P02 P03 P12 P13 P14 P15
-   6   1          P0PU |= 0x01 << 2;
-   7   1          P0PU |= 0x01 << 3;
-   8   1          P1PU |= 0x01 << 2;
-   9   1          P1PU |= 0x01 << 3;
-  10   1          P1PU |= 0x01 << 4;
-  11   1          P1PU |= 0x01 << 5;
-  12   1      }
-  13          
-  14          
-  15          unsigned char addr_read(void)
-  16          {
-  17   1          unsigned char addr = 0;
-  18   1          addr |= ((unsigned char)(!P15)) << 5;
-  19   1          addr |= ((unsigned char)(!P14)) << 4;
-  20   1          addr |= ((unsigned char)(!P13)) << 3;
-  21   1          addr |= ((unsigned char)(!P12)) << 2;
-  22   1          addr |= ((unsigned char)(!P03)) << 1;
-  23   1          addr |= ((unsigned char)(!P02)) << 0;
-  24   1          return addr;
-  25   1      }
-  26          
-  27          
+   2          
+   3          void addr_init(void)
+   4          {
+   5   1          /* P02, P03, P12, P13, P14 and P15: active-low address switches. */
+   6   1          P_SW2 |= 0x80;
+   7   1          P0PU |= (0x01 << 2) | (0x01 << 3);
+   8   1          P1PU |= (0x01 << 2) | (0x01 << 3) | (0x01 << 4) | (0x01 << 5);
+   9   1          P_SW2 &= ~0x80;
+  10   1      
+  11   1          P02 = 1;
+  12   1          P03 = 1;
+  13   1          P12 = 1;
+  14   1          P13 = 1;
+  15   1          P14 = 1;
+  16   1          P15 = 1;
+  17   1      }
+  18          
+  19          unsigned char addr_read(void)
+  20          {
+  21   1          unsigned char sensor_address = 0;
+  22   1      
+  23   1          sensor_address |= ((unsigned char)(!P15)) << 5;
+  24   1          sensor_address |= ((unsigned char)(!P14)) << 4;
+  25   1          sensor_address |= ((unsigned char)(!P13)) << 3;
+  26   1          sensor_address |= ((unsigned char)(!P12)) << 2;
+  27   1          sensor_address |= ((unsigned char)(!P03)) << 1;
+  28   1          sensor_address |= ((unsigned char)(!P02));
+  29   1      
+  30   1          return sensor_address;
+  31   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =    122    ----
+   CODE SIZE        =    124    ----
    CONSTANT SIZE    =   ----    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =   ----    ----
